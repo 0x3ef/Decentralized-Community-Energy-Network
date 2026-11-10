@@ -240,6 +240,19 @@ async def _insert_batch(
             node = await session.get(CommunityNode, authorization.node_id) if authorization else None
             if not authorization or not authorization.active or not node or not node.authorized:
                 raise ValueError("Device is not authorized by a community")
+            from src.modules.community.models import EnergyCommunity
+            community=await session.get(EnergyCommunity,node.community_id)
+            if community is None or community.status != "ACTIVE":
+                raise ValueError("Community has not been activated by governance")
+            if community.registry_address:
+                from src.modules.community.service import CommunityService
+                home = await session.get(__import__('src.modules.home.models',fromlist=['Home']).Home,node.home_id)
+                await CommunityService().membership(session,community.id,home.owner_id)
+                from src.modules.community.chain import CommunityChain
+                registry=CommunityChain().contract('CommunityRegistry',community.registry_address)
+                device=await session.get(Device,device_uuid)
+                if registry.functions.meters(community.id.bytes.rjust(32,b'\0'),device.device_id.bytes.rjust(32,b'\0')).call()!=node.id.bytes.rjust(32,b'\0'):
+                    raise ValueError('On-chain meter authorization revoked')
             supplied = hashlib.sha256(str(raw.get("credential", "")).encode()).hexdigest()
             if not hmac.compare_digest(supplied, authorization.credential_hash):
                 raise ValueError("Invalid device credential")
@@ -248,7 +261,7 @@ async def _insert_batch(
                 raise ValueError("MQTT topic does not match authorized meter")
             if abs((datetime.now(UTC) - envelope.measured_at).total_seconds()) > 86400 or envelope.measured_at > datetime.now(UTC) + __import__('datetime').timedelta(seconds=30):
                 raise ValueError("Telemetry timestamp outside acceptance window")
-        except ValueError as exc:
+        except (ValueError, PermissionError) as exc:
             logger.warning("Skipping message: %s", exc)
             continue
         prepared.append((envelope, device_uuid, errors))

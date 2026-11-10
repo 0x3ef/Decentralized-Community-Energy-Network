@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     DOMAIN: str = "localhost:8000"
     WEB3_PROVIDER_URL: str = "http://localhost:8545"
     CHAIN_ID: int = 31337
+    COMMUNITY_REGISTRY_ADDRESS: str = ""
     SUN_TOKEN_ADDRESS: str = ""
     MOCK_USD_ADDRESS: str = ""
     ENERGY_MARKET_ADDRESS: str = ""

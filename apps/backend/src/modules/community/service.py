@@ -34,6 +34,18 @@ class CommunityService:
         *,
         operator: bool = False,
     ) -> CommunityMembership:
+        community = await session.get(EnergyCommunity, community_id)
+        if community is None or community.status != "ACTIVE":
+            raise PermissionError("Community requires verified governance activation")
+        if community.registry_address:
+            from src.modules.community.chain import CommunityChain
+
+            chain = CommunityChain()
+            registry = chain.contract("CommunityRegistry", community.registry_address)
+            if not registry.functions.isActive(
+                community_id.bytes.rjust(32, b"\0")
+            ).call():
+                raise PermissionError("Community is suspended or paused on chain")
         result = await session.exec(
             select(CommunityMembership).where(
                 CommunityMembership.community_id == community_id,
@@ -46,17 +58,32 @@ class CommunityService:
             raise PermissionError(
                 "Active community membership with the required role is required"
             )
+        if community.registry_address:
+            wallet = await self.wallet(session, user_id)
+            if operator:
+                assigned = registry.functions.communities(
+                    community_id.bytes.rjust(32, b"\0")
+                ).call()[1]
+                if assigned.lower() != wallet.lower():
+                    raise PermissionError("Operator must be appointed by governance")
+            elif not registry.functions.isMember(
+                community_id.bytes.rjust(32, b"\0"), wallet
+            ).call():
+                raise PermissionError("Active on-chain membership required")
         return membership
 
     async def create(
         self, session: AsyncSession, actor: User, name: str
     ) -> EnergyCommunity:
-        community = EnergyCommunity(name=name)
+        community = EnergyCommunity(name=name, proposer_id=actor.uid)
         session.add(community)
         await session.flush()
         session.add(
             CommunityMembership(
-                community_id=community.id, user_id=actor.uid, role="operator"
+                community_id=community.id,
+                user_id=actor.uid,
+                role="member",
+                status="PENDING",
             )
         )
         return community
@@ -70,7 +97,12 @@ class CommunityService:
             raise LookupError("Home not found")
         await self.membership(session, community_id, home.owner_id)
         node = CommunityNode(
-            community_id=community_id, home_id=home_id, authorized=True
+            community_id=community_id,
+            home_id=home_id,
+            authorized=(
+                await session.get(EnergyCommunity, community_id)
+            ).registry_address
+            is None,
         )
         session.add(node)
         await session.flush()
@@ -114,6 +146,20 @@ class CommunityService:
             raise ValueError(
                 "An authoritative meter is already registered for this node channel"
             )
+        governed = await session.get(EnergyCommunity, node.community_id)
+        if governed.registry_address:
+            from src.modules.community.chain import CommunityChain
+
+            registry = CommunityChain().contract(
+                "CommunityRegistry", governed.registry_address
+            )
+            if registry.functions.meters(
+                node.community_id.bytes.rjust(32, b"\0"),
+                device.device_id.bytes.rjust(32, b"\0"),
+            ).call() != node.id.bytes.rjust(32, b"\0"):
+                raise PermissionError(
+                    "Meter registrar must authorize this node/device on chain first"
+                )
         authorization = MeterAuthorization(
             device_id=device.id,
             node_id=node.id,
@@ -478,5 +524,5 @@ class CommunityService:
             - sum(r.energy_wh for r in requests if r.status == "CONFIRMED"),
             "retirements": requests,
             "simulated_payments": payments,
-            "payment_notice": "USDx is unbacked simulated Colombian peso points, not real money",
+            "payment_notice": "Historical payments retain their explicit original asset units. New governed settlement uses native test ETH; no fiat conversion.",
         }

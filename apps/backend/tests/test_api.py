@@ -50,8 +50,8 @@ async def test_signup_home_membership_and_wallet_challenge():
             f"/api/v1/communities/{cid}/nodes",
             json={"home_id": home.json()["home"]["id"]},
         )
-        assert node.status_code == 201, node.text
-        assert (await client.get(f"/api/v1/communities/{cid}/nodes")).status_code == 200
+        assert node.status_code == 403, node.text
+        assert (await client.get(f"/api/v1/communities/{cid}/nodes")).status_code == 403
         meter = await client.post(
             "/api/v1/device/device",
             json={

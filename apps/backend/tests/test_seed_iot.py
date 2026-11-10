@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 from sqlmodel import select, func
 from src.core.db import AsyncSessionFactory
-from src.seed import seed_demo
+from src.seed import seed_demo, identifier
 from src.modules.auth.models import User
 from src.modules.auth.utils import verify_password
 from src.modules.home.models import Home
@@ -91,6 +91,15 @@ async def test_seeded_physical_readings_create_only_observed_export_eligibility(
     async with AsyncSessionFactory() as db:
         plan = await seed_demo(
             db, "seed-test-password-only", "seed-test-device-key-at-least-32-chars"
+        )
+        await db.commit()
+
+        from src.modules.community.models import EnergyCommunity
+
+        fixture_community = await db.get(EnergyCommunity, identifier("community"))
+        assert fixture_community.status == "DRAFT"
+        fixture_community.status = (
+            "ACTIVE"  # Accounting-only fixture; no API governance bypass.
         )
         await db.commit()
 

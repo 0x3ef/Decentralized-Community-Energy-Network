@@ -11,6 +11,7 @@ from src.core.db import get_session
 from src.modules.auth.dependencies import get_current_user
 from src.modules.community.models import (
     CommunityMembership,
+    EnergyCommunity,
     CommunityNode,
     ChainDeployment,
     CompensationRequest,
@@ -28,6 +29,12 @@ service = CommunityService()
 
 
 class CommunityCreate(BaseModel):
+    boundary_description: str = Field(default="", max_length=1000)
+    topology: str = Field(
+        default="SIMULATED_GRID_CONNECTED",
+        pattern="^(SIMULATED_GRID_CONNECTED|PARTIAL_MICROGRID|INDEPENDENT_MICROGRID)$",
+    )
+    interval_seconds: int = Field(default=900, gt=0, le=86400)
     name: str = Field(min_length=1, max_length=150)
     sun_per_kwh: Decimal = Field(
         default=Decimal(1), gt=0, max_digits=24, decimal_places=8
@@ -78,6 +85,11 @@ async def create(
     session=Depends(get_session),
 ):
     community = await service.create(session, actor, payload.name)
+    if payload.sun_per_kwh != 1:
+        raise ValueError("Governed SUN v2 uses exactly 1 SUN per eligible kWh")
+    community.boundary_description = payload.boundary_description
+    community.topology = payload.topology
+    community.interval_seconds = payload.interval_seconds
     community.sun_per_kwh = payload.sun_per_kwh
     community.loss_factor = payload.loss_factor
     await session.commit()
@@ -324,7 +336,11 @@ async def balances(
             sun.functions.allowance(address, deployment.compensation_address).call()
         ),
         "contracts": deployment,
-        "payment_notice": "Unbacked simulated peso points",
+        "payment_notice": (
+            "Unbacked simulated US dollars"
+            if payment.functions.name().call().startswith("Simulated US Dollar")
+            else "Legacy simulated peso units; not USDx v2"
+        ),
     }
 
 
@@ -361,6 +377,9 @@ async def register_deployment(
     session=Depends(get_session),
 ):
     await service.membership(session, community_id, actor.uid, operator=True)
+    community = await session.get(EnergyCommunity, community_id)
+    if community.registry_address:
+        raise ValueError("Governed communities require native ETH deployment")
     chain = CommunityChain()
     if payload.chain_id != chain.web3.eth.chain_id or payload.chain_id not in (
         31337,
@@ -621,7 +640,8 @@ async def my_communities(actor=Depends(get_current_user), session=Depends(get_se
             )
             .where(
                 CommunityMembership.user_id == actor.uid,
-                CommunityMembership.status == "ACTIVE",
+                (CommunityMembership.status == "ACTIVE")
+                | (EnergyCommunity.proposer_id == actor.uid),
             )
         )
     ).all()
@@ -637,3 +657,193 @@ async def community_nodes(
             select(CommunityNode).where(CommunityNode.community_id == community_id)
         )
     ).all()
+
+
+@router.post("/{community_id}/governance/sync")
+async def synchronize_governance(
+    community_id: UUID,
+    payload: TransactionInput,
+    actor=Depends(get_current_user),
+    session=Depends(get_session),
+):
+    """Relay verified registry evidence; being a relayer confers no authority."""
+    from src.core.config import Config
+    from src.modules.community.models import EnergyCommunity
+
+    if not Config.COMMUNITY_REGISTRY_ADDRESS:
+        raise ValueError("A governed CommunityRegistry deployment must be configured")
+    community = (
+        await session.exec(
+            select(EnergyCommunity)
+            .where(EnergyCommunity.id == community_id)
+            .with_for_update()
+        )
+    ).first()
+    if community is None:
+        raise LookupError("Community proposal not found")
+    chain = CommunityChain()
+    registry = chain.contract("CommunityRegistry", Config.COMMUNITY_REGISTRY_ADDRESS)
+    receipt = chain.canonical_receipt(payload.transaction_hash)
+    logs = chain.event(registry, "CommunityTransition", receipt)
+    key = community_id.bytes.rjust(32, b"\0")
+    matching = [event for event in logs if event.args.communityId == key]
+    if len(matching) != 1:
+        raise ValueError("Receipt does not establish this community transition")
+    current = registry.functions.communities(key).call()
+    event = matching[0].args
+    if int(current[2]) != int(event.status):
+        raise ValueError(
+            "Registry has a newer state; synchronize the current transition"
+        )
+    statuses = (
+        "DRAFT",
+        "PROPOSED",
+        "UNDER_REVIEW",
+        "APPROVED",
+        "ACTIVE",
+        "SUSPENDED",
+        "REJECTED",
+        "ARCHIVED",
+    )
+    if community.boundary_hash and community.boundary_hash != Web3.to_hex(
+        event.boundary
+    ):
+        raise ValueError("Boundary commitment differs from submitted proposal")
+    if community.policy_hash and community.policy_hash != Web3.to_hex(event.policy):
+        raise ValueError("Policy commitment differs from submitted proposal")
+    if community.sun_per_kwh != 1:
+        raise ValueError(
+            "Legacy conversion requires explicit migration before activation"
+        )
+    community.status = statuses[int(event.status)]
+    community.registry_address = registry.address
+    community.governance_transaction = payload.transaction_hash
+    community.boundary_hash = Web3.to_hex(event.boundary)
+    community.policy_hash = Web3.to_hex(event.policy)
+    community.interval_seconds = int(event.intervalSeconds)
+    if community.status == "ACTIVE":
+        if not registry.functions.isActive(key).call():
+            raise ValueError("Registry is paused")
+        wallet = (
+            await session.exec(
+                select(Wallet).where(
+                    Wallet.address == Web3.to_checksum_address(event.operator),
+                    Wallet.is_verified.is_(True),
+                )
+            )
+        ).first()
+        if wallet is None:
+            raise ValueError(
+                "Governance-appointed operator must link their wallet first"
+            )
+        membership = (
+            await session.exec(
+                select(CommunityMembership).where(
+                    CommunityMembership.community_id == community_id,
+                    CommunityMembership.user_id == wallet.user_id,
+                )
+            )
+        ).first()
+        if membership is None:
+            membership = CommunityMembership(
+                community_id=community_id, user_id=wallet.user_id
+            )
+            session.add(membership)
+        membership.role = "operator"
+        membership.status = "ACTIVE"
+    await session.commit()
+    return community
+
+
+@router.post("/{community_id}/propose")
+async def propose_boundary(
+    community_id: UUID, actor=Depends(get_current_user), session=Depends(get_session)
+):
+    import json
+    from src.core.config import Config
+    from src.modules.community.models import EnergyCommunity
+
+    row = (
+        await session.exec(
+            select(EnergyCommunity)
+            .where(EnergyCommunity.id == community_id)
+            .with_for_update()
+        )
+    ).first()
+    if row is None or row.proposer_id != actor.uid:
+        raise PermissionError("Only the draft author may submit it")
+    if row.status != "DRAFT" or not row.boundary_description:
+        raise ValueError("A described physical boundary in DRAFT state is required")
+    row.boundary_hash = Web3.to_hex(
+        Web3.keccak(
+            text=json.dumps(
+                {"description": row.boundary_description, "topology": row.topology},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+    )
+    row.policy_hash = Web3.to_hex(
+        Web3.keccak(
+            text=json.dumps(
+                {
+                    "interval_seconds": row.interval_seconds,
+                    "sun_per_kwh": "1",
+                    "loss_factor": str(row.loss_factor),
+                    "temporal_policy": row.temporal_policy,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+    )
+    row.status = "PROPOSED"
+    transaction = None
+    if Config.COMMUNITY_REGISTRY_ADDRESS:
+        registry = CommunityChain().contract(
+            "CommunityRegistry", Config.COMMUNITY_REGISTRY_ADDRESS
+        )
+        transaction = {
+            "to": registry.address,
+            "data": registry.functions.propose(
+                row.id.bytes.rjust(32, b"\0"),
+                Web3.to_bytes(hexstr=row.boundary_hash),
+                Web3.to_bytes(hexstr=row.policy_hash),
+                row.interval_seconds,
+            )._encode_transaction_data(),
+        }
+    await session.commit()
+    return {
+        "community": row,
+        "transaction": transaction,
+        "notice": "Proposal grants no authority; only governance may approve and activate.",
+    }
+
+
+@router.post("/nodes/{node_id}/governance/sync")
+async def synchronize_node(
+    node_id: UUID, actor=Depends(get_current_user), session=Depends(get_session)
+):
+    from src.modules.community.models import CommunityNode, EnergyCommunity
+    from src.modules.home.models import Home
+
+    node = await session.get(CommunityNode, node_id)
+    if node is None:
+        raise LookupError("Node proposal not found")
+    await service.membership(session, node.community_id, actor.uid, operator=True)
+    community = await session.get(EnergyCommunity, node.community_id)
+    if not community.registry_address:
+        raise ValueError("Governed registry required")
+    home = await session.get(Home, node.home_id)
+    wallet = await service.wallet(session, home.owner_id)
+    registry = CommunityChain().contract(
+        "CommunityRegistry", community.registry_address
+    )
+    registered = registry.functions.nodes(
+        node.community_id.bytes.rjust(32, b"\0"), node.id.bytes.rjust(32, b"\0")
+    ).call()
+    if registered.lower() != wallet.lower():
+        raise ValueError("Node registrar has not approved this owner and physical node")
+    node.authorized = True
+    await session.commit()
+    return node

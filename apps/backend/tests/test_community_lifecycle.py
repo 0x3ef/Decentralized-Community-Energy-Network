@@ -82,6 +82,18 @@ async def test_full_community_lifecycle():
         db.add_all([producer, consumer])
         await db.flush()
         community = await svc.create(db, producer, "Demo " + unique)
+        # Isolate legacy accounting tests from registry synchronization tests.
+        community.status = "ACTIVE"
+        proposer_membership = (
+            await db.exec(
+                select(CommunityMembership).where(
+                    CommunityMembership.community_id == community.id,
+                    CommunityMembership.user_id == producer.uid,
+                )
+            )
+        ).one()
+        proposer_membership.status = "ACTIVE"
+        proposer_membership.role = "operator"
         db.add(CommunityMembership(community_id=community.id, user_id=consumer.uid))
         h1 = Home(
             owner_id=producer.uid, address="Producer", city="Cali", has_battery=True
@@ -236,8 +248,12 @@ async def test_full_community_lifecycle():
             db, [{**messages[-1], "sequence_number": 3, "credential": "wrong"}]
         ) == (0, 0)
         await db.commit()
-        spoofed={**messages[0], "sequence_number":99, "_mqtt_topic":"solar/other/unknown/telemetry"}
-        assert await _insert_batch(db,[spoofed]) == (0,0)
+        spoofed = {
+            **messages[0],
+            "sequence_number": 99,
+            "_mqtt_topic": "solar/other/unknown/telemetry",
+        }
+        assert await _insert_batch(db, [spoofed]) == (0, 0)
         await db.commit()
         processor = EnergyProcessor()
         assert await processor.process_pending(db) >= 8
@@ -334,6 +350,16 @@ async def test_full_community_lifecycle():
             0
         ].id == payments[0].id
         other = await svc.create(db, consumer, "Other community " + unique)
+        other.status = "ACTIVE"
+        other_member = (
+            await db.exec(
+                select(CommunityMembership).where(
+                    CommunityMembership.community_id == other.id,
+                    CommunityMembership.user_id == consumer.uid,
+                )
+            )
+        ).one()
+        other_member.status = "ACTIVE"
         with pytest.raises(ValueError, match="community"):
             await svc.reserve_compensation(
                 db,
