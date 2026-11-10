@@ -115,3 +115,9 @@ See [SETTLEMENT_VERIFICATION.md](SETTLEMENT_VERIFICATION.md) for the 28-test bac
 suite, real contract end-to-end scenario, reorganization/crash recovery and
 current implementation limits. [AUTOMATED_SETTLEMENT.md](AUTOMATED_SETTLEMENT.md)
 documents configuration, native APIs, worker operation and exact accounting.
+
+
+## Community-aware IoT v2
+
+See [IOT_VERIFICATION.md](IOT_VERIFICATION.md) for the 43 backend tests, 86 IoT tests,
+real TLS/ACL broker test, explicit simulation provenance and current limitations.

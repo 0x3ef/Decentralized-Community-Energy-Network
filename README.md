@@ -1,5 +1,8 @@
 # Solar Energy Market
 
+[Current IoT protocol](docs/DEPIN_IOT.md) · [IoT verification](docs/IOT_VERIFICATION.md):
+community-bound v2 telemetry, explicit simulation provenance, quality audits and TLS ACLs.
+
 **Current governed protocol:** SUN energy credits plus native Anvil/Sepolia test ETH.
 Community creation grants no operator privileges. See [native ETH protocol](docs/NATIVE_ETH_PROTOCOL.md)
 for deployment, authority, API interactions, tests and limitations. The
