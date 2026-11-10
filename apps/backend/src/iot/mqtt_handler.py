@@ -21,6 +21,7 @@ import hashlib
 import hmac
 import logging
 import signal
+import time
 import uuid
 from contextlib import suppress
 from datetime import UTC, datetime
@@ -66,6 +67,9 @@ class MqttIngestWorker:
             clean_session=False,
             manual_ack=True,
         )
+        self._client.reconnect_delay_set(min_delay=1,max_delay=30)
+        if Config.MQTT_USERNAME:self._client.username_pw_set(Config.MQTT_USERNAME,Config.MQTT_PASSWORD)
+        if Config.MQTT_TLS_CA:self._client.tls_set(ca_certs=Config.MQTT_TLS_CA,certfile=Config.MQTT_TLS_CERT,keyfile=Config.MQTT_TLS_KEY)
         self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect
         self._client.on_message = self._on_message
@@ -105,6 +109,10 @@ class MqttIngestWorker:
     def _on_message(
         self, client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage
     ) -> None:
+        if len(msg.payload)>Config.MAX_TELEMETRY_BYTES:
+            logger.warning("Rejected oversized MQTT payload")
+            client.ack(msg.mid,msg.qos)
+            return
         try:
             payload = json.loads(msg.payload)
         except json.JSONDecodeError:
@@ -157,6 +165,7 @@ class MqttIngestWorker:
 
     async def _persist(self, batch: list[dict[str, Any]]) -> None:
         delay = 1
+        batch_started=time.monotonic()
         while not self._stop.is_set():
             try:
                 async with self._session_factory() as session:
@@ -165,7 +174,7 @@ class MqttIngestWorker:
                 for payload in batch:
                     if "_mqtt_mid" in payload:
                         self._client.ack(payload["_mqtt_mid"], payload["_mqtt_qos"])
-                logger.info("Batch persisted: %d inserted, %d skipped", inserted, skipped)
+                logger.info(json.dumps({"event":"ingest_batch_committed","persisted":inserted,"duplicates":skipped,"rejected_before_insert":len(batch)-inserted-skipped,"latency_seconds":round(time.monotonic()-batch_started,6),"queue_depth":self._queue.qsize()}))
                 return
             except Exception:
                 logger.exception("Database batch failed; retrying in %s seconds", delay)
@@ -283,6 +292,7 @@ async def _insert_batch(
     inserted_rows = result.all()
     inserted_ids = {row.id for row in inserted_rows}
 
+    typed_ids: set[uuid.UUID] = set()
     for envelope, device_uuid, errors in prepared:
         if errors:
             continue
@@ -295,8 +305,9 @@ async def _insert_batch(
             ),
             None,
         )
-        if row_id is None:
+        if row_id is None or row_id in typed_ids:
             continue
+        typed_ids.add(row_id)
         await _insert_typed_reading(session, row_id, envelope)
 
     return len(inserted_ids), len(prepared) - len(inserted_ids)

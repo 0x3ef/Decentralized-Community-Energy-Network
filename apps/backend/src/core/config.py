@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     BACKEND_PRIVATE_KEY: str = ""
     BLOCKCHAIN_CONFIRMATION_BLOCKS: int = 2
     BLOCKCHAIN_RECEIPT_TIMEOUT_SECONDS: int = 120
+    MAX_METER_POWER_W: int = 100000
+    MAX_TELEMETRY_BYTES: int = 65536
+    MQTT_USERNAME: str | None = None
+    MQTT_PASSWORD: str | None = None
+    MQTT_TLS_CA: str | None = None
+    MQTT_TLS_CERT: str | None = None
+    MQTT_TLS_KEY: str | None = None
     MQTT_HOST: str = "localhost"
     MQTT_PORT: int = 1883
     MQTT_TOPIC: str = "solar/#"

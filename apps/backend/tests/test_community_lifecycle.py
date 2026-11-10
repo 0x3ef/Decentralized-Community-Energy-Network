@@ -204,7 +204,7 @@ async def test_full_community_lifecycle():
             await asyncio.wait_for(subscribed.wait(), timeout=10)
             publisher.connect(Config.MQTT_HOST, Config.MQTT_PORT)
             publisher.loop_start()
-            for payload in messages:
+            for payload in messages + messages:
                 topic = f"solar/{payload['home_id']}/{payload['device_id']}/telemetry"
                 info = publisher.publish(topic, json.dumps(payload), qos=1)
                 await asyncio.to_thread(info.wait_for_publish, 10)
@@ -235,6 +235,9 @@ async def test_full_community_lifecycle():
         assert await _insert_batch(
             db, [{**messages[-1], "sequence_number": 3, "credential": "wrong"}]
         ) == (0, 0)
+        await db.commit()
+        spoofed={**messages[0], "sequence_number":99, "_mqtt_topic":"solar/other/unknown/telemetry"}
+        assert await _insert_batch(db,[spoofed]) == (0,0)
         await db.commit()
         processor = EnergyProcessor()
         assert await processor.process_pending(db) >= 8
