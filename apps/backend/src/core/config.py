@@ -1,5 +1,5 @@
 """Validated configuration; secrets are supplied by the environment."""
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     WEB3_PROVIDER_URL: str = "http://localhost:8545"
     CHAIN_ID: int = 31337
     COMMUNITY_REGISTRY_ADDRESS: str = ""
+    GOVERNANCE_TIMELOCK_ADDRESS: str = ""
+    NATIVE_SETTLEMENT_ENABLED: bool = True
+    NATIVE_SETTLEMENT_START_BLOCK: int = Field(default=0, ge=0)
+    NATIVE_SETTLEMENT_LOOKBACK_HOURS: int = Field(default=24, ge=1, le=168)
+    NATIVE_SETTLEMENT_INTERVAL_LIMIT: int = Field(default=200, ge=1, le=2000)
     SUN_TOKEN_ADDRESS: str = ""
     MOCK_USD_ADDRESS: str = ""
     ENERGY_MARKET_ADDRESS: str = ""

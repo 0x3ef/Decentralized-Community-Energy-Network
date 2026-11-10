@@ -67,3 +67,6 @@ async def integrity_conflict(request: Request, exc: IntegrityError):
 
 from src.modules.community.native_routes import router as native_router
 app.include_router(native_router,prefix=f"{version_prefix}/communities",tags=['native ETH settlement'])
+
+from src.modules.settlement.routes import router as settlement_router
+app.include_router(settlement_router,prefix=f"{version_prefix}/communities",tags=["native interval settlement"])

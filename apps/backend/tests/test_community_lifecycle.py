@@ -426,8 +426,13 @@ async def test_full_community_lifecycle():
             retirement.functions.retire(Web3.keccak(text=str(request.id))), buyer
         )
         burn_hash = Web3.to_hex(burn.transactionHash)
-        await chain.sync_events(AsyncSessionFactory)
-        await db.refresh(request)
+        # The indexer deliberately processes at most 500 blocks per pass.
+        # A reused Anvil chain may already have thousands of earlier blocks.
+        for _ in range(1 + w3.eth.block_number // 500):
+            await chain.sync_events(AsyncSessionFactory)
+            await db.refresh(request)
+            if request.status == "CONFIRMED":
+                break
         assert request.status == "CONFIRMED"
         await chain.confirm_retirement(db, consumer, request.id, burn_hash)
         await db.commit()

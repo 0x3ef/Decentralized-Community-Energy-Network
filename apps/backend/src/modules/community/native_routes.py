@@ -11,6 +11,7 @@ from src.modules.community.chain import CommunityChain
 from src.modules.community.models import EnergyCommunity, NativeDeployment
 from src.modules.community.service import CommunityService
 from web3 import Web3
+from web3.exceptions import ContractLogicError
 
 router = APIRouter()
 service = CommunityService()
@@ -33,6 +34,7 @@ class Transaction(BaseModel):
         "approve_sun",
         "approve_retirement",
         "execute",
+        "cancel",
         "retire",
     ]
     amount_base_units: str = Field(default="0", pattern=r"^\d+$", max_length=78)
@@ -127,24 +129,41 @@ async def balances(
     chain, deployment, wallet, vault, _settlement = await context(
         session, community_id, user, allow_exit=True
     )
+    from src.core.config import Config
+
+    height = max(
+        0,
+        chain.web3.eth.block_number - max(1, Config.BLOCKCHAIN_CONFIRMATION_BLOCKS) + 1,
+    )
     community = await session.get(EnergyCommunity, community_id)
     registry = chain.contract("CommunityRegistry", community.registry_address)
     sun = chain.contract("SUNToken", deployment.sun_address)
     return {
         "address": wallet,
+        "block_number": height,
         "chain_id": deployment.chain_id,
         "contracts": deployment,
-        "wallet_wei": str(chain.web3.eth.get_balance(wallet)),
-        "available_wei": str(vault.functions.available(wallet).call()),
-        "reserved_wei": str(vault.functions.reserved(wallet).call()),
-        "earnings_wei": str(vault.functions.earnings(wallet).call()),
-        "sun_units": str(sun.functions.balanceOf(wallet).call()),
-        "escrow_sun_units": str(vault.functions.sunAvailable(wallet).call()),
-        "reserved_sun_units": str(vault.functions.sunReserved(wallet).call()),
+        "wallet_wei": str(chain.web3.eth.get_balance(wallet, height)),
+        "available_wei": str(
+            vault.functions.available(wallet).call(block_identifier=height)
+        ),
+        "reserved_wei": str(
+            vault.functions.reserved(wallet).call(block_identifier=height)
+        ),
+        "earnings_wei": str(
+            vault.functions.earnings(wallet).call(block_identifier=height)
+        ),
+        "sun_units": str(sun.functions.balanceOf(wallet).call(block_identifier=height)),
+        "escrow_sun_units": str(
+            vault.functions.sunAvailable(wallet).call(block_identifier=height)
+        ),
+        "reserved_sun_units": str(
+            vault.functions.sunReserved(wallet).call(block_identifier=height)
+        ),
         "price_wei_per_kwh": str(
-            registry.functions.priceWeiPerKwh(
-                community_id.bytes.rjust(32, b"\0")
-            ).call()
+            registry.functions.priceWeiPerKwh(community_id.bytes.rjust(32, b"\0")).call(
+                block_identifier=height
+            )
         ),
         "asset": "Sepolia ETH" if deployment.chain_id == 11155111 else "Anvil ETH",
         "notice": "Test ETH; no fiat conversion or guaranteed real monetary value.",
@@ -162,12 +181,13 @@ async def prepare(
         session,
         community_id,
         user,
-        allow_exit=payload.action in ("withdraw", "withdraw_earnings", "withdraw_sun"),
+        allow_exit=payload.action
+        in ("withdraw", "withdraw_earnings", "withdraw_sun", "cancel"),
     )
     amount = int(payload.amount_base_units)
     if amount >= 2**256:
         raise ValueError("Amount exceeds uint256")
-    if payload.action not in ("execute", "retire") and amount == 0:
+    if payload.action not in ("execute", "retire", "cancel") and amount == 0:
         raise ValueError("Positive amount required")
     value = 0
     if payload.action == "deposit":
@@ -193,6 +213,8 @@ async def prepare(
             else vault.address,
             amount,
         )
+    elif payload.action == "cancel":
+        function = vault.functions.cancel(Web3.to_bytes(hexstr=payload.claim_id))
     elif payload.action == "execute":
         function = vault.functions.execute(Web3.to_bytes(hexstr=payload.claim_id))
     else:
@@ -208,7 +230,10 @@ async def prepare(
             proof,
         )
     # Simulate only: no custody, transaction submission, or false success record.
-    function.call({"from": wallet, "value": value})
+    try:
+        function.call({"from": wallet, "value": value})
+    except ContractLogicError as exc:
+        raise ValueError("Contract rejected the requested operation") from exc
     return {
         "chain_id": deployment.chain_id,
         "from": wallet,

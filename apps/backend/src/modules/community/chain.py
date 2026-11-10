@@ -164,17 +164,22 @@ class CommunityChain:
             ).functions.setMember(wallet, membership.status == "ACTIVE")
         else:
             raise ValueError("Unsupported community outbox operation")
+        return await self.sign_operation(session, event, function, deployment.chain_id)
+
+    async def sign_operation(self, session, event, function, chain_id):
+        """Shared signer/nonce journal for legacy and native protocol workers."""
+        account = self.web3.eth.account.from_key(Config.BACKEND_PRIVATE_KEY)
         # PostgreSQL transaction lock coordinates every worker sharing the signer.
         lock = int.from_bytes(
-            Web3.keccak(text=f"{deployment.chain_id}:{account.address}")[:8],
+            Web3.keccak(text=f"{chain_id}:{account.address}")[:8],
             "big",
             signed=True,
         )
-        await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock})
+        await session.exec(text("SELECT pg_advisory_xact_lock(:key)"), params={"key": lock})
         maximum = (
             await session.exec(
                 select(func.max(ChainOperation.nonce)).where(
-                    ChainOperation.chain_id == deployment.chain_id,
+                    ChainOperation.chain_id == chain_id,
                     ChainOperation.sender == account.address,
                 )
             )
@@ -196,14 +201,14 @@ class CommunityChain:
             {
                 "from": account.address,
                 "nonce": nonce,
-                "chainId": deployment.chain_id,
+                "chainId": chain_id,
                 **fees,
             }
         )
         signed = account.sign_transaction(transaction)
         operation = ChainOperation(
             outbox_id=event.id,
-            chain_id=deployment.chain_id,
+            chain_id=chain_id,
             sender=account.address,
             nonce=nonce,
             transaction_hash=Web3.to_hex(signed.hash),
