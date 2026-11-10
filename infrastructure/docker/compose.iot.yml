@@ -9,7 +9,13 @@ services:
       secrets: [proxy_ca]
     environment:
       USE_GRPC: 'false'
+      SIMULATION_MODE: REALTIME
+      SIMULATION_SPEED: 1
+      FAULT_SCENARIO: none
       MQTT_HOST: mosquitto
+      MQTT_PORT: ${SIMULATOR_MQTT_PORT:-1883}
+      MQTT_TLS: ${SIMULATOR_MQTT_TLS:-false}
+      MQTT_CA_CERT: /run/simulation/ca.crt
       DEVICE_REGISTRY: /run/simulation/registry.json
       CHECKPOINT_PATH: /state/simulator.json
       # The registry references env binding names, never embedded credentials.
@@ -17,6 +23,7 @@ services:
     volumes:
       - ${SIMULATOR_REGISTRY_FILE:?Set the path to the provisioned registry}:/run/simulation/registry.json:ro
       - simulation_state:/state
+      - ${SIMULATOR_CA_FILE:-/etc/ssl/certs/ca-certificates.crt}:/run/simulation/ca.crt:ro
     depends_on: [mosquitto, subscriber]
 volumes:
   simulation_state:

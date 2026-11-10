@@ -20,7 +20,7 @@ class EnergyDeltas:
 class EnergyCalculator:
     """Calculate energy deltas and export eligibility without database access."""
 
-    VERSION = "v2-authoritative-export"
+    VERSION = "v3-validated-grid-counters"
 
     @staticmethod
     def counter_delta(previous_wh: int | None, current_wh: int | None) -> int:

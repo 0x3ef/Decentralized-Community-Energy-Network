@@ -9,7 +9,7 @@ class DeviceService:
         if not await HomeService().get_home_by_id(user,device_data.home_id,session):
             raise PermissionError('Home belongs to another user')
         data=device_data.model_dump()
-        data['device_type']={'SMART_METER':'smart_meter','INVERTER':'solar_inverter','BATTERY':'battery_monitor'}.get(data['device_type'],data['device_type'])
+        data['device_type']={'SMART_METER':'smart_meter','INVERTER':'solar_inverter','BATTERY':'battery_monitor','WEATHER_SENSOR':'weather_sensor'}.get(data['device_type'],data['device_type'])
         row=Device(**data); session.add(row); await session.commit()
         return row
     async def get_devices_by_home(self,user,home_id,session):

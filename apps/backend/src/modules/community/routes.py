@@ -29,6 +29,7 @@ service = CommunityService()
 
 
 class CommunityCreate(BaseModel):
+    allow_simulated_telemetry: bool = False
     boundary_description: str = Field(default="", max_length=1000)
     topology: str = Field(
         default="SIMULATED_GRID_CONNECTED",
@@ -87,6 +88,7 @@ async def create(
     community = await service.create(session, actor, payload.name)
     if payload.sun_per_kwh != 1:
         raise ValueError("Governed SUN v2 uses exactly 1 SUN per eligible kWh")
+    community.allow_simulated_telemetry = payload.allow_simulated_telemetry
     community.boundary_description = payload.boundary_description
     community.topology = payload.topology
     community.interval_seconds = payload.interval_seconds
@@ -791,6 +793,7 @@ async def propose_boundary(
                     "sun_per_kwh": "1",
                     "loss_factor": str(row.loss_factor),
                     "temporal_policy": row.temporal_policy,
+                    "allow_simulated_telemetry": row.allow_simulated_telemetry,
                 },
                 sort_keys=True,
                 separators=(",", ":"),

@@ -9,7 +9,7 @@ from src.core.config import Config
 from src.modules.community.chain import CommunityChain
 from src.modules.community.models import ChainOperation
 from src.modules.device.models import Device
-from src.modules.energy.models import EnergyCredit, OutboxEvent
+from src.modules.energy.models import EnergyCredit, EnergyInterval, OutboxEvent
 from src.modules.settlement.engine import key
 from src.modules.settlement.models import (
     IndexedNativeEvent,
@@ -54,10 +54,19 @@ class NativeSettlementChain(CommunityChain):
             + 1,
         )
 
+    async def validate_source(self, session, batch):
+        for evidence in batch.evidence.get("measurements", []):
+            interval = await session.get(EnergyInterval, UUID(evidence["interval_id"]))
+            if interval is None or interval.quality_status != "FINALIZED":
+                raise ValueError(
+                    "Source evidence requires review; native operations withheld"
+                )
+
     async def function(self, session, job):
         batch = await session.get(SettlementBatch, UUID(job.payload["batch_id"]))
         if not batch or batch.status == "RECONCILIATION_REQUIRED":
             raise ValueError("Batch requires reconciliation before new operations")
+        await self.validate_source(session, batch)
         _, deployment, _registry, settlement, vault = await self.service.contracts(
             session, batch.community_id
         )
@@ -175,6 +184,16 @@ class NativeSettlementChain(CommunityChain):
                     try:
                         self.web3.eth.get_transaction(tx_hash)
                     except TransactionNotFound:
+                        async with factory() as validation_session:
+                            original_job = await validation_session.get(
+                                OutboxEvent, job_id
+                            )
+                            original_batch = await validation_session.get(
+                                SettlementBatch, UUID(original_job.payload["batch_id"])
+                            )
+                            await self.validate_source(
+                                validation_session, original_batch
+                            )
                         self.web3.eth.send_raw_transaction(binary(raw))
                 else:
                     if (

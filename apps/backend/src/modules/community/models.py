@@ -27,6 +27,7 @@ class EnergyCommunity(SQLModel, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     status: str = Field(default="DRAFT", max_length=20)
     proposer_id: UUID | None = Field(default=None, foreign_key="users.uid")
+    allow_simulated_telemetry: bool = False
     boundary_description: str = Field(default="", max_length=1000)
     topology: str = Field(default="SIMULATED_GRID_CONNECTED", max_length=50)
     policy_hash: str = Field(default="", max_length=66)

@@ -188,6 +188,7 @@ async def test_native_pipeline_replay_crash_recovery_and_reorganization(monkeypa
             policy_hash=policy_hash,
             boundary_hash=Web3.to_hex(Web3.keccak(text="Cali physical fixture")),
             registry_address=registry.address,
+            allow_simulated_telemetry=True,
             governance_transaction=Web3.to_hex(activated.transactionHash),
         )
         db.add(community)
@@ -214,6 +215,7 @@ async def test_native_pipeline_replay_crash_recovery_and_reorganization(monkeypa
             meter = Device(
                 home_id=home.id,
                 device_type="smart_meter",
+                telemetry_source="SIMULATED",
                 mqtt_client_id=uuid4().hex,
                 status="ACTIVE",
             )
@@ -255,7 +257,17 @@ async def test_native_pipeline_replay_crash_recovery_and_reorganization(monkeypa
                 f = seq - 1
                 messages.append(
                     {
-                        "schema_version": "1.0",
+                        "schema_version": "2.0",
+                        "message_id": str(uuid4()),
+                        "community_id": str(cid),
+                        "node_id": str(nodes[i].id),
+                        "source": "SIMULATED",
+                        "simulation_mode": "REALTIME",
+                        "units": {
+                            "grid_export_energy_kwh": "kWh",
+                            "grid_import_energy_kwh": "kWh",
+                            "consumption_energy_kwh": "kWh",
+                        },
                         "device_id": str(meter.device_id),
                         "home_id": str(meter.home_id),
                         "sensor_type": "smart_meter",

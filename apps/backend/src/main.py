@@ -70,3 +70,6 @@ app.include_router(native_router,prefix=f"{version_prefix}/communities",tags=['n
 
 from src.modules.settlement.routes import router as settlement_router
 app.include_router(settlement_router,prefix=f"{version_prefix}/communities",tags=["native interval settlement"])
+
+from src.iot.routes import router as telemetry_router
+app.include_router(telemetry_router,prefix=f"{version_prefix}/iot",tags=["telemetry quality"])

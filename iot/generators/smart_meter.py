@@ -70,6 +70,7 @@ class SmartMeterGenerator:
                 **{
                     k: float(v) if isinstance(v, Decimal) else v
                     for k, v in reading.items()
+                    if k in sensor_pb2.SmartMeterMeasurements.DESCRIPTOR.fields_by_name
                 }
             ),
         )

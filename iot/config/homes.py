@@ -2,7 +2,7 @@
 
 Adding a home is a one-liner: call :func:`build_home` with the desired
 parameters. Sensor codes are derived from the home id and the sensor
-type, and follow the same convention as ``database/seeds/03_devices.sql``
+type, and follow the same convention as the canonical SQLModel demo registry (``src.seed``)
 so that the simulator produces telemetry for devices that are already
 registered in the database.
 
@@ -94,3 +94,30 @@ def build_default_homes() -> list[Home]:
         # 3 kW PV, no battery → SM, INV, WS
         build_home("HOME-MS-005", "Cali", solar_kw=3, battery_kwh=0),
     ]
+
+
+def load_catalogue(path: str):
+    """Load reusable per-home profiles without adding simulator subclasses."""
+    import json
+    from pathlib import Path
+    from simulator.physics import profile_for
+
+    rows = json.loads(Path(path).read_text())
+    homes = []
+    profiles = {}
+    for row in rows:
+        if set(row) - {"home_id", "city", "solar_kw", "battery_kwh", "profile"}:
+            raise ValueError("Unknown home catalogue field")
+        home = build_home(
+            row["home_id"],
+            row["city"],
+            row.get("solar_kw", 0),
+            row.get("battery_kwh", 0),
+        )
+        if home.home_id in profiles:
+            raise ValueError("Duplicate catalogue home")
+        homes.append(home)
+        profiles[home.home_id] = profile_for(row.get("profile", "prosumer"))
+    if not homes:
+        raise ValueError("Home catalogue cannot be empty")
+    return homes, profiles

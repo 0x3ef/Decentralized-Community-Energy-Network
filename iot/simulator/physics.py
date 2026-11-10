@@ -6,18 +6,23 @@ not an irradiance forecast, calibrated meter, or regulatory settlement model.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, UTC
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-from math import sin, cos, pi, radians
+from math import cos, pi, radians, sin
 from random import Random
 from zoneinfo import ZoneInfo
+
 from models.home import Home
 
-D = lambda value: Decimal(str(value))
+
+def as_decimal(value):
+    return Decimal(str(value))
 
 
 @dataclass(frozen=True)
 class HomeProfile:
+    usage: str = "residential"
+    appliance_w: Decimal = Decimal(600)
     latitude: float = 3.45
     longitude: float = -76.53
     timezone: str = "America/Bogota"
@@ -32,6 +37,8 @@ class HomeProfile:
     pv_efficiency: Decimal = Decimal("0.96")
 
     def __post_init__(self):
+        if self.usage not in ("residential", "producer", "commercial"):
+            raise ValueError("Unknown load usage")
         ZoneInfo(self.timezone)
         if not (-90 <= self.latitude <= 90 and -180 <= self.longitude <= 180):
             raise ValueError("Invalid geographic coordinates")
@@ -46,7 +53,16 @@ class HomeProfile:
             )
         ):
             raise ValueError("Efficiency must be within (0,1]")
-        if min(self.baseline_w, self.peak_w, self.occupancy, self.max_battery_w) < 0:
+        if (
+            min(
+                self.baseline_w,
+                self.peak_w,
+                self.occupancy,
+                self.max_battery_w,
+                self.appliance_w,
+            )
+            < 0
+        ):
             raise ValueError("Profile powers and occupancy must be nonnegative")
 
 
@@ -69,7 +85,9 @@ class HomeEnergyModel:
                 "discharge",
             )
         }
-        self.stored = home.battery_capacity_kwh * Decimal("0.5")
+        self.stored = home.battery_capacity_kwh * min(
+            self.profile.max_soc, max(self.profile.min_soc, Decimal("0.5"))
+        )
         self.daily_generation = Decimal(0)
         self.day = None
         self.state: dict = {}
@@ -105,24 +123,37 @@ class HomeEnergyModel:
             return self.state
         if self.previous and at < self.previous:
             raise ValueError("Simulation clock cannot regress")
+        if self.previous and (at - self.previous) > timedelta(seconds=60):
+            while at - self.previous > timedelta(seconds=60):
+                self.step(self.previous + timedelta(seconds=60))
         elapsed = (
-            D((at - self.previous).total_seconds()) if self.previous else Decimal(0)
+            as_decimal((at - self.previous).total_seconds())
+            if self.previous
+            else Decimal(0)
         )
         hours = elapsed / 3600
         p = self.profile
         local = at.astimezone(ZoneInfo(p.timezone))
         hour = local.hour + local.minute / 60
-        cloud = D(self.rng.uniform(0.55, 1))
-        solar = D(self.solar_factor(at)) * cloud
+        cloud = self.state.get("cloud", Decimal(1)) * Decimal("0.8") + as_decimal(
+            self.rng.uniform(0.55, 1)
+        ) * Decimal("0.2")
+        solar = as_decimal(self.solar_factor(at)) * cloud
         generation = self.home.solar_capacity_kw * 1000 * solar * p.pv_efficiency
-        morning = D(max(0, 1 - abs(hour - 7) / 2))
-        evening = D(max(0, 1 - abs(hour - 19) / 3))
+        morning = as_decimal(max(0, 1 - abs(hour - 7) / 2))
+        evening = as_decimal(max(0, 1 - abs(hour - 19) / 3))
         weekend = Decimal("1.15") if local.weekday() >= 5 else Decimal(1)
         load = (
             (p.baseline_w + p.peak_w * (morning + evening) * p.occupancy)
             * weekend
-            * D(self.rng.uniform(0.9, 1.1))
+            * as_decimal(self.rng.uniform(0.9, 1.1))
         )
+        if p.usage == "commercial":
+            load = p.baseline_w + (
+                p.peak_w if local.weekday() < 5 and 8 <= hour < 18 else Decimal(0)
+            )
+        if self.rng.random() < 0.12:
+            load += p.appliance_w
         charge = discharge = Decimal(0)
         capacity = self.home.battery_capacity_kwh
         surplus = generation - load
@@ -170,6 +201,7 @@ class HomeEnergyModel:
         self.previous = at
         self.state = {
             **flows,
+            "cloud": cloud,
             "soc": self.stored / capacity * 100 if capacity else Decimal(0),
             "irradiance": solar * 1000,
             "temperature": Decimal(24) + solar * 20,
@@ -185,6 +217,7 @@ class HomeEnergyModel:
                 current_a=abs(s["import"] - s["export"]) / 120,
                 frequency_hz=60,
                 active_power_w=s["import"] - s["export"],
+                consumption_power_w=s["consumption"],
                 power_factor=1,
                 grid_import_power_w=s["import"],
                 grid_export_power_w=s["export"],
@@ -206,6 +239,11 @@ class HomeEnergyModel:
         if kind == "battery_monitor":
             return dict(
                 state_of_charge_pct=s["soc"],
+                capacity_kwh=self.home.battery_capacity_kwh,
+                cumulative_charge_energy_kwh=c["charge"],
+                cumulative_discharge_energy_kwh=c["discharge"],
+                charge_efficiency_pct=self.profile.charge_efficiency * 100,
+                discharge_efficiency_pct=self.profile.discharge_efficiency * 100,
                 battery_voltage_v=52,
                 battery_current_a=(s["charge"] - s["discharge"]) / 52,
                 charge_power_w=s["charge"],
@@ -220,3 +258,26 @@ class HomeEnergyModel:
             relative_humidity_pct=65,
             wind_speed_m_s=2,
         )
+
+
+def profile_for(kind: str, **overrides) -> HomeProfile:
+    defaults = {
+        "consumer": {},
+        "solar_producer": {
+            "usage": "producer",
+            "baseline_w": Decimal(40),
+            "peak_w": Decimal(100),
+            "appliance_w": Decimal(0),
+        },
+        "prosumer": {},
+        "battery_prosumer": {},
+        "commercial": {
+            "usage": "commercial",
+            "baseline_w": Decimal(1200),
+            "peak_w": Decimal(6000),
+            "appliance_w": Decimal(2000),
+        },
+    }
+    if kind not in defaults:
+        raise ValueError("Unknown home profile")
+    return HomeProfile(**{**defaults[kind], **overrides})

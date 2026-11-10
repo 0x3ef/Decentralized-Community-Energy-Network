@@ -107,6 +107,7 @@ class CommunitySettlementService:
                 "node_types": ["smart_meter"],
                 "measurement": "finalized-net-grid-counters-with-boundary-coverage",
                 "loss_factor": str(community.loss_factor),
+                "allow_simulated_telemetry": community.allow_simulated_telemetry,
                 "funding": "ETH-and-SUN-reserved-before-execute",
                 "rounding": "ceil-per-producer-consumer-edge-wei",
                 "unallocated": "retained-producer-SUN-no-payment",
@@ -181,6 +182,11 @@ class CommunitySettlementService:
             if len(meters) != 1:
                 continue
             device = meters[0]
+            if device.telemetry_source == "SIMULATED" and (
+                not _community.allow_simulated_telemetry
+                or deployment.chain_id not in (31337, 1337)
+            ):
+                continue
             if registry.functions.meters(
                 key(community_id), key(device.device_id)
             ).call() != key(node.id):
@@ -192,14 +198,14 @@ class CommunitySettlementService:
                         TelemetryMessage.device_id == device.id,
                         TelemetryMessage.measured_at >= start,
                         TelemetryMessage.measured_at <= end,
-                        TelemetryMessage.quality_status == "PROCESSED",
                     )
                     .order_by(TelemetryMessage.measured_at)
                 )
             ).all()
             # Conservative: missing either boundary establishes no full-interval eligibility.
             if (
-                len(messages) < 2
+                any(m.quality_status != "PROCESSED" for m in messages)
+                or len(messages) < 2
                 or messages[0].measured_at != start
                 or messages[-1].measured_at != end
             ):
@@ -237,6 +243,11 @@ class CommunitySettlementService:
                     "injection_wh": supply,
                     "demand_wh": demand,
                     "calculation_version": interval.calculation_version,
+                    "source": device.telemetry_source,
+                    "schema_versions": sorted({m.schema_version for m in messages}),
+                    "simulation_modes": sorted(
+                        {m.payload.get("simulation_mode", "REALTIME") for m in messages}
+                    ),
                 }
             )
         # Net self-supplied energy across a wallet's multiple physical nodes.

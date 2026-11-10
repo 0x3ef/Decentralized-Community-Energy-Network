@@ -266,23 +266,7 @@ async def test_full_community_lifecycle():
         assert credit.energy_wh == 5000 and credit.token_amount == Decimal(5)
         await svc.approve_credit(db, producer, credit.id)
         await db.commit()
-        late = {
-            **messages[0],
-            "sequence_number": 3,
-            "measured_at": (start + timedelta(minutes=1)).isoformat(),
-        }
-        assert await _insert_batch(db, [late]) == (1, 0)
-        await db.commit()
-        await processor.process_pending(db)
-        rejected = (
-            await db.exec(
-                select(TelemetryMessage).where(
-                    TelemetryMessage.device_id == meters[0].id,
-                    TelemetryMessage.sequence_number == 3,
-                )
-            )
-        ).one()
-        assert rejected.quality_status == "REJECTED"
+
     snapshot = w3.provider.make_request("evm_snapshot", [])["result"]
     w3.provider.make_request("evm_setAutomine", [False])
     try:
@@ -472,3 +456,25 @@ async def test_full_community_lifecycle():
             await db.get(CompensationRequest, request_id)
         ).status == "RECONCILIATION"
         assert (await db.get(EnergyCredit, credit_id)).status == "FAILED"
+
+        # Late contradictory evidence is a separate incident, never a valid mint input.
+        late = {
+            **messages[0],
+            "sequence_number": 3,
+            "measured_at": (start + timedelta(minutes=1)).isoformat(),
+        }
+        assert await _insert_batch(db, [late]) == (1, 0)
+        await db.commit()
+        await processor.process_pending(db)
+        rejected = (
+            await db.exec(
+                select(TelemetryMessage).where(
+                    TelemetryMessage.device_id == meters[0].id,
+                    TelemetryMessage.sequence_number == 3,
+                )
+            )
+        ).one()
+        assert rejected.quality_status == "REJECTED"
+        current_credit = await db.get(EnergyCredit, credit_id)
+        disputed = await db.get(EnergyInterval, current_credit.interval_id)
+        assert disputed.quality_status == "DISPUTED"

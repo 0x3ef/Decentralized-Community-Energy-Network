@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import ssl
+import time
 from threading import Lock
 from typing import Any
 
@@ -46,6 +47,7 @@ class MqttPublisher:
         if qos not in (1, 2):
             raise ValueError("Durable telemetry requires QoS 1 or 2")
         self._timeout = publish_timeout
+        self._status_topic = f"solar/status/{client_id}"
         self._qos = qos
         self._lock = Lock()
 
@@ -61,7 +63,9 @@ class MqttPublisher:
 
         if tls:
             if not ca_cert or bool(client_cert) != bool(client_key):
-                raise ValueError("TLS requires a CA certificate and a complete optional client certificate/key pair")
+                raise ValueError(
+                    "TLS requires a CA certificate and a complete optional client certificate/key pair"
+                )
             self._client.tls_set(
                 ca_certs=ca_cert,
                 certfile=client_cert,
@@ -69,10 +73,26 @@ class MqttPublisher:
                 tls_version=ssl.PROTOCOL_TLS_CLIENT,
             )
 
+        self._client.will_set(
+            self._status_topic,
+            json.dumps({"state": "OFFLINE", "client_id": client_id}),
+            qos=1,
+            retain=True,
+        )
         self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect
 
-        self._client.connect(host, port, keepalive=60)
+        deadline = time.monotonic() + publish_timeout
+        delay = 0.25
+        while True:
+            try:
+                self._client.connect(host, port, keepalive=60)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(min(delay, max(0, deadline - time.monotonic())))
+                delay = min(5, delay * 2)
         self._client.loop_start()
 
     def _on_connect(
@@ -84,6 +104,9 @@ class MqttPublisher:
         properties: Any = None,
     ) -> None:
         if rc == 0:
+            client.publish(
+                self._status_topic, json.dumps({"state": "ONLINE"}), qos=1, retain=True
+            )
             logger.info("Connected to MQTT broker")
         else:
             logger.error("MQTT connection failed (rc=%s)", rc)
@@ -100,7 +123,11 @@ class MqttPublisher:
 
     def publish(self, topic: str, message: dict[str, Any]) -> None:
         """Validate ``message`` and publish it as JSON to ``topic``."""
-        expected = f"solar/{message['home_id']}/{message['device_id']}/telemetry"
+        expected = (
+            f"solar/{message['community_id']}/{message['node_id']}/{message['device_id']}/telemetry"
+            if message.get("schema_version") == "2.0"
+            else f"solar/{message['home_id']}/{message['device_id']}/telemetry"
+        )
         if topic != expected:
             raise ValueError("Telemetry topic does not match device identity")
         payload_model = TelemetryPayload.model_validate(
@@ -125,5 +152,10 @@ class MqttPublisher:
 
     def close(self) -> None:
         """Stop the network loop and disconnect."""
-        self._client.loop_stop()
+        info = self._client.publish(
+            self._status_topic, json.dumps({"state": "OFFLINE"}), qos=1, retain=True
+        )
+        if info.rc == mqtt.MQTT_ERR_SUCCESS:
+            info.wait_for_publish(timeout=min(self._timeout, 2))
         self._client.disconnect()
+        self._client.loop_stop()

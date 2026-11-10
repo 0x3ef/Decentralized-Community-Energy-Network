@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from datetime import datetime
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -38,7 +40,14 @@ class Settings(BaseSettings):
     mqtt_password: str | None = None
     random_seed: int | None = None
     sequence_offset: int | None = None
-    use_grpc: bool = True
+    use_grpc: bool = False
+    simulation_mode: Literal["REALTIME", "ACCELERATED", "DETERMINISTIC"] = "REALTIME"
+    simulation_speed: float = Field(default=1, gt=0, allow_inf_nan=False)
+    simulation_start: datetime | None = None
+    fault_scenario: str = "none"
+    fault_device: str | None = None
+    home_catalogue_file: str | None = None
+    max_cycles: int | None = Field(default=None, gt=0)
     gateway_address: str = "gateway:50051"
     log_level: str = "INFO"
 
