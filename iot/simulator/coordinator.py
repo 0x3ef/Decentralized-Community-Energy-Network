@@ -31,12 +31,12 @@ class SimulationConfig:
 
     interval_seconds: float = 15.0
     sequence_offset: int = 0
+    random_seed: int | None = None
+    checkpoint_path: str | None = None
 
     def __post_init__(self) -> None:
         if self.interval_seconds <= 0:
-            raise ValueError(
-                "interval_seconds must be greater than zero"
-            )
+            raise ValueError("interval_seconds must be greater than zero")
         if self.sequence_offset < 0:
             raise ValueError("sequence_offset cannot be negative")
 
@@ -56,6 +56,7 @@ class Simulator:
         generators: dict[SensorType, SensorGenerator],
         publisher: TelemetryPublisher | None = None,
         config: SimulationConfig | None = None,
+        profiles: dict | None = None,
     ) -> None:
         self._homes = tuple(homes)
         self._generators = generators
@@ -64,6 +65,35 @@ class Simulator:
         self._sequence_numbers: dict[str, int] = {}
         self._sequence_offset = self._config.sequence_offset
         self._validate_configuration()
+        from simulator.physics import HomeEnergyModel
+        import hashlib
+
+        shared = {
+            home.home_id: HomeEnergyModel(
+                home,
+                profile=(profiles or {}).get(home.home_id),
+                seed=int.from_bytes(
+                    hashlib.sha256(
+                        f"{self._config.random_seed}:{home.home_id}".encode()
+                    ).digest()[:8],
+                    "big",
+                ),
+            )
+            for home in self._homes
+        }
+        self._pending: dict[str, dict] = {}
+        self._energy_models = shared
+        if self._config.checkpoint_path:
+            from simulator.checkpoint import load
+
+            load(
+                self._config.checkpoint_path,
+                self._sequence_numbers,
+                shared,
+                self._pending,
+            )
+        for generator in self._generators.values():
+            generator._energy_models = shared
 
     def _validate_configuration(self) -> None:
         """Validate homes, devices and generator registrations."""
@@ -80,14 +110,11 @@ class Simulator:
                         f"{sensor.home_id}, not {home.home_id}"
                     )
                 if sensor.device_code in device_codes:
-                    raise ValueError(
-                        f"Duplicate device code: {sensor.device_code}"
-                    )
+                    raise ValueError(f"Duplicate device code: {sensor.device_code}")
                 device_codes.add(sensor.device_code)
                 if sensor.sensor_type not in self._generators:
                     raise ValueError(
-                        f"No generator registered for "
-                        f"{sensor.sensor_type}"
+                        f"No generator registered for {sensor.sensor_type}"
                     )
                 self._sequence_numbers[sensor.device_code] = self._sequence_offset
 
@@ -99,9 +126,7 @@ class Simulator:
     ) -> dict[str, Any] | None:
         """Generate one telemetry message for ``sensor``."""
         if not sensor.is_active:
-            logger.debug(
-                "Skipping inactive device %s", sensor.device_code
-            )
+            logger.debug("Skipping inactive device %s", sensor.device_code)
             return None
 
         next_sequence = self._sequence_numbers[sensor.device_code] + 1
@@ -125,24 +150,34 @@ class Simulator:
             "data": data,
         }
 
-    def simulate_cycle(self) -> list[dict[str, Any]]:
+    def simulate_cycle(
+        self, measured_at: datetime | None = None
+    ) -> list[dict[str, Any]]:
         """Run one cycle over every active device."""
-        measured_at = datetime.now(UTC)
+        measured_at = measured_at or datetime.now(UTC)
         messages: list[dict[str, Any]] = []
 
         for home in self._homes:
             for sensor in home.devices:
                 try:
+                    if sensor.device_code in self._pending:
+                        message = self._pending[sensor.device_code]
+                        self._publisher.publish(sensor.get_mqtt_topic(), message)
+                        del self._pending[sensor.device_code]
+                        messages.append(message)
+                        continue
                     message = self.simulate_sensor(
-                        home=home, sensor=sensor, measured_at=measured_at,
+                        home=home,
+                        sensor=sensor,
+                        measured_at=measured_at,
                     )
                     if message is None:
                         continue
 
                     if self._publisher is not None:
-                        self._publisher.publish(
-                            sensor.get_mqtt_topic(), message
-                        )
+                        self._pending[sensor.device_code] = message
+                        self._publisher.publish(sensor.get_mqtt_topic(), message)
+                        del self._pending[sensor.device_code]
 
                     messages.append(message)
                     logger.info(
@@ -157,6 +192,15 @@ class Simulator:
                         sensor.device_code,
                     )
 
+        if self._config.checkpoint_path:
+            from simulator.checkpoint import save
+
+            save(
+                self._config.checkpoint_path,
+                self._sequence_numbers,
+                self._energy_models,
+                self._pending,
+            )
         return messages
 
     def run(self, stop_event: Event | None = None) -> None:

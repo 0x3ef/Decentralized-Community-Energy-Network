@@ -28,9 +28,7 @@ _PREFIX: dict[SensorType, str] = {
 }
 
 
-def _make_sensor(
-    home_id: str, sensor_type: SensorType, index: int
-) -> Sensor:
+def _make_sensor(home_id: str, sensor_type: SensorType, index: int) -> Sensor:
     """Build a :class:`Sensor` whose code matches the seed convention.
 
     The city segment is extracted from the home id: ``HOME-MS-001``
@@ -38,8 +36,8 @@ def _make_sensor(
     in ``home_id``.
     """
     parts = home_id.split("-")
-    city = parts[1]          # HOME-MS-001 → MS
-    suffix = parts[-1]       # HOME-MS-001 → 001
+    city = parts[1]  # HOME-MS-001 → MS
+    suffix = parts[-1]  # HOME-MS-001 → 001
     return Sensor(
         device_code=f"{_PREFIX[sensor_type]}-{city}-{suffix}-{index:03d}",
         sensor_type=sensor_type,
@@ -64,10 +62,7 @@ def build_home(
     for index, sensor_type in enumerate(SensorType, start=1):
         if sensor_type == SensorType.SOLAR_INVERTER and solar_kw <= 0:
             continue
-        if (
-            sensor_type == SensorType.BATTERY_MONITOR
-            and battery_kwh <= 0
-        ):
+        if sensor_type == SensorType.BATTERY_MONITOR and battery_kwh <= 0:
             continue
         devices.append(_make_sensor(home_id, sensor_type, index))
 
@@ -83,20 +78,19 @@ def build_home(
 def build_default_homes() -> list[Home]:
     """Return the demo community used for local testing.
 
-    Every home is a prosumer: it can produce and consume at the same
-    time. The parameters describe installed capacity, not the role the
+    The catalogue contains solar prosumers and consumer-only households. The parameters describe installed capacity, not the role the
     home plays in the market. Whether a home sells or buys in a given
     interval is decided by its net balance, not by its configuration.
     """
     return [
         # 4 kW PV + 10 kWh battery → SM, INV, WS, BM
-        build_home("HOME-MS-001", "Moscow", solar_kw=4, battery_kwh=10),
+        build_home("HOME-MS-001", "Cali", solar_kw=4, battery_kwh=10),
         # 6 kW PV, no battery → SM, INV, WS
-        build_home("HOME-MS-002", "Moscow", solar_kw=6, battery_kwh=0),
+        build_home("HOME-MS-002", "Cali", solar_kw=6, battery_kwh=0),
         # No PV, no battery → SM, WS
-        build_home("HOME-MS-003", "Moscow", solar_kw=0, battery_kwh=0),
+        build_home("HOME-MS-003", "Cali", solar_kw=0, battery_kwh=0),
         # No PV, 5 kWh battery → SM, WS, BM
-        build_home("HOME-MS-004", "Moscow", solar_kw=0, battery_kwh=5),
+        build_home("HOME-MS-004", "Cali", solar_kw=0, battery_kwh=5),
         # 3 kW PV, no battery → SM, INV, WS
-        build_home("HOME-MS-005", "Moscow", solar_kw=3, battery_kwh=0),
+        build_home("HOME-MS-005", "Cali", solar_kw=3, battery_kwh=0),
     ]

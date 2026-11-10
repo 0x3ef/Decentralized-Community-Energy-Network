@@ -1,0 +1,7 @@
+# Optional loopback-only password+ACL broker; use TLS for untrusted networks.
+services:
+  mosquitto:
+    volumes:
+      - ./mosquitto/secure/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ${MQTT_PASSWORD_FILE:?Set a provisioned Mosquitto password file}:/run/mqtt/passwords:ro
+      - ${MQTT_ACL_FILE:?Set a provisioned per-device ACL file}:/run/mqtt/acl:ro

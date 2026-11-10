@@ -126,3 +126,16 @@ and [implementation architecture](docs/PROTOTYPE_ARCHITECTURE.md) for evidence a
 This is a technical and academic prototype. Deployment requires independent
 review of applicable CREG, UPME, network operator, metering, consumer protection
 and financial requirements. No regulatory authorization is implied.
+
+## SQLModel demo seed
+
+The stale raw SQL fixtures have been replaced by `src.seed`, which imports the
+actual database models. Apply migrations, explicitly set DATABASE_URL for your
+local development database, supply SEED_PASSWORD (12+ characters) and optionally
+SEED_DEVICE_KEY (32+ characters), then run `./scripts/seed_db.sh` from the backend
+virtual environment. See [seed instructions](database/seeds/README.md).
+
+The generated registry covers all 15 sensors across five simulator homes and can
+be passed directly to DEVICE_REGISTRY. Device credentials are written only to the
+private output directory, never source control or logs. Seeds do not create token
+balances, approved credits or verified wallets.

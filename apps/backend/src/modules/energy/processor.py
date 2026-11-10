@@ -204,10 +204,15 @@ class EnergyProcessor:
             measured_at - timedelta(microseconds=1), INTERVAL_MINUTES
         )
         if snapshot.measured_at < interval_start:
-            raise ValueError(
-                "Counter gap crosses accounting interval; incomplete data cannot issue credits"
-            )
+            logger.warning("Counter gap: establishing baseline without energy credit, device=%s channel=%s", device_id,counter_name)
+            snapshot.counter_value_wh=current_value
+            snapshot.measured_at=measured_at
+            return 0
         delta = self.calculator.counter_delta(snapshot.counter_value_wh, current_value)
+        from src.core.config import Config
+        elapsed=Decimal(str((measured_at-snapshot.measured_at).total_seconds()))
+        if Decimal(delta)>Decimal(Config.MAX_METER_POWER_W)*elapsed/3600+2:
+            raise ValueError("Counter spike exceeds configured maximum meter power")
         if current_value < snapshot.counter_value_wh:
             logger.warning(
                 "Counter reset detected: device=%s counter=%s",

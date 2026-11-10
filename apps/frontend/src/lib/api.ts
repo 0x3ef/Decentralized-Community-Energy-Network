@@ -182,7 +182,7 @@ api.interceptors.response.use(undefined, async (error) => {
   refreshPromise ??= axios
     .get<TokenResponse>(`${api.defaults.baseURL}/auth/refresh_token`, {headers: {Authorization: `Bearer ${refreshToken}`}})
     .then(({ data }) => {
-      authTokens.set(data)
+      authTokens.set({...data,refresh_token:refreshToken!})
       return data.access_token
     })
     .catch(() => {
@@ -206,9 +206,9 @@ export const apiClient = {
     await api.post('/auth/signup', {email:body.email,password:body.password,first_name,last_name:last.join(' ') || first_name,username:crypto.randomUUID().slice(0,8)})
     return (await api.post<TokenResponse>('/auth/login',{email:body.email,password:body.password})).data
   },
-  forgotPassword: (email: string) => api.post('/auth/password/forgot', { email }).then((r) => r.data),
+  forgotPassword: (email: string) => api.post('/auth/password-reset-request', { email }).then((r) => r.data),
   resetPassword: (token: string, password: string) =>
-    api.post('/auth/password/reset', { token, password }).then((r) => r.data),
+    api.post(`/auth/password-reset-confirm/${encodeURIComponent(token)}`, { new_password:password, confirm_new_password:password }).then((r) => r.data),
   me: () => api.get('/auth/me').then(({data}) => ({...data,id:data.uid,full_name:`${data.first_name} ${data.last_name}`} as User)),
   logout: () => api.get('/auth/logout'),
   portfolio: () => api.get<Record<string, unknown>>('/users/me/portfolio').then((r) => r.data),

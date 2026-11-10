@@ -1,3 +1,67 @@
+# Coordinated IoT simulation
+
+Current implementation and evidence: [IoT audit](../docs/IOT_AUDIT.md).
+All sensors in a home observe one model. Default location is Cali, Colombia;
+legacy MS sensor identifiers are preserved as stable labels, not authorization.
+
+## Run locally
+
+```bash
+source .venv/bin/activate
+cd iot
+USE_GRPC=false PUBLISHER=console RANDOM_SEED=42 python -m simulator.main
+```
+
+For authenticated accounting, register homes/devices and authorize meters through
+community APIs first. Copy `examples/registry.example.json` outside the checkout,
+replace the example UUIDs with actual provisioned identities, and add an entry for
+**each enabled sensor**. Entries reference credential environment names, not values.
+Supply those values securely in the runtime environment, then run:
+
+```bash
+USE_GRPC=false MQTT_HOST=127.0.0.1 DEVICE_REGISTRY=/private/registry.json \
+  CHECKPOINT_PATH=/private/state/simulator.json python -m simulator.main
+```
+
+`HOME_PROFILES_JSON` maps friendly home IDs to HomeProfile overrides, such as
+`{"HOME-MS-003":{"baseline_w":1200,"peak_w":3000,"occupancy":2}}`.
+Profiles accept latitude, longitude, IANA timezone, demand, SOC, efficiencies and
+battery power limits. `RANDOM_SEED` controls independent per-home RNG streams.
+Use `Simulator.simulate_cycle(aware_datetime)` for deterministic offline steps;
+`SimulationClock(start, speed, offline=True)` supports accelerated test clocks.
+Do not publish accelerated future data to normal ingestion.
+
+`simulator.faults.inject` provides optional duplicate, outage, packet-loss,
+out-of-order, reset, drift, delay, invalid-schema and spike transformations.
+It never activates automatically. Checkpoints preserve original unsent messages;
+after an unknown acknowledgement, retrying can redeliver the same sequence and
+backend persistent deduplication prevents duplicate accounting.
+
+## Docker
+
+Use the root `compose.prototype.yml` together with `compose.iot.yml`, configure
+SIMULATOR_REGISTRY_FILE and a private SIMULATOR_ENV_FILE, and enable the simulation
+profile. The simulator runs all configured homes in one scheduler and stores state
+in a dedicated volume. The optional `compose.mqtt-auth.yml` mounts provisioned
+Mosquitto password and ACL files; `secure/acl.example` demonstrates exact-device
+write permissions and subscriber read permissions. Adapt it to the registry.
+
+MQTT_USERNAME/MQTT_PASSWORD configure broker login. IoT MQTT_TLS, MQTT_CA_CERT,
+MQTT_CLIENT_CERT and MQTT_CLIENT_KEY enable verified mutual TLS. The backend uses
+MQTT_TLS_CA, MQTT_TLS_CERT and MQTT_TLS_KEY for equivalent subscriber configuration.
+Never disable certificate verification or place credentials in checked-in JSON.
+
+## Tests
+
+From the repository root, activate the venv and run `./scripts/test_iot.sh -q` and
+`./scripts/test_backend.sh -q`. The former starts its own gateway against the local
+broker; the latter uses isolated PostgreSQL/MQTT/Redis/Anvil containers.
+
+---
+
+The following original module reference is retained for context; legacy gRPC demo
+instructions do not provision authorized UUID identities or credentials.
+
 # IoT Simulation and Telemetry Gateway
 
 The `iot/` package provides a deterministic, local-first telemetry

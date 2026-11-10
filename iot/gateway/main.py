@@ -33,6 +33,9 @@ def _build_publisher(settings: Settings) -> TelemetryPublisher:
             port=settings.mqtt_port,
             client_id=settings.mqtt_client_id,
             qos=settings.mqtt_qos,
+            username=settings.mqtt_username, password=settings.mqtt_password,
+            tls=settings.mqtt_tls, ca_cert=settings.mqtt_ca_cert,
+            client_cert=settings.mqtt_client_cert, client_key=settings.mqtt_client_key,
         )
     return ConsolePublisher()
 
