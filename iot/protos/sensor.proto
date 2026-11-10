@@ -1,0 +1,134 @@
+syntax = "proto3";
+
+package solar.sensors.v1;
+
+// ============================================================================
+// Smart meter
+// ============================================================================
+
+message SmartMeterMeasurements {
+  double voltage_v = 1;
+  double current_a = 2;
+  double frequency_hz = 3;
+  double active_power_w = 4;
+  double power_factor = 5;
+  double grid_import_power_w = 6;
+  double grid_export_power_w = 7;
+  double consumption_energy_kwh = 8;
+  double grid_import_energy_kwh = 9;
+  double grid_export_energy_kwh = 10;
+}
+
+message SmartMeterSensorRequest {
+  string device_id = 1;
+  string timestamp = 2;
+  int64 sequence = 3;
+  string home_id = 4;
+  SmartMeterMeasurements measurements = 5;
+}
+
+message SmartMeterSensorResponse {
+  string status = 1;
+}
+
+service SmartMeterSensorService {
+  rpc SendSmartMeterRequest(SmartMeterSensorRequest)
+      returns (SmartMeterSensorResponse);
+}
+
+// ============================================================================
+// Solar inverter
+// ============================================================================
+
+message SolarInverterMeasurements {
+  double dc_power_w = 1;
+  double ac_power_w = 2;
+  double daily_energy_kwh = 3;
+  double lifetime_energy_kwh = 4;
+  double temperature_c = 5;
+  double efficiency_pct = 6;
+}
+
+message SolarInverterStatus {
+  bool operating_state = 1;
+  string alarm_code = 2;
+}
+
+message SolarInverterSensorRequest {
+  string device_id = 1;
+  string timestamp = 2;
+  int64 sequence = 3;
+  string home_id = 4;
+  SolarInverterMeasurements measurements = 5;
+  SolarInverterStatus status = 6;
+}
+
+message SolarInverterSensorResponse {
+  string status = 1;
+}
+
+service SolarInverterSensorService {
+  rpc SendSolarInverterRequest(SolarInverterSensorRequest)
+      returns (SolarInverterSensorResponse);
+}
+
+// ============================================================================
+// Weather sensor
+// ============================================================================
+
+message WeatherMeasurements {
+  double irradiance_w_m2 = 1;
+  double ambient_temperature_c = 2;
+  double panel_temperature_c = 3;
+  double relative_humidity_pct = 4;
+  double wind_speed_m_s = 5;
+}
+
+message WeatherSensorRequest {
+  string device_id = 1;
+  string timestamp = 2;
+  int64 sequence = 3;
+  string home_id = 4;
+  WeatherMeasurements measurements = 5;
+}
+
+message WeatherSensorResponse {
+  string status = 1;
+}
+
+service WeatherSensorService {
+  rpc SendWeatherRequest(WeatherSensorRequest)
+      returns (WeatherSensorResponse);
+}
+
+// ============================================================================
+// Battery monitor
+// ============================================================================
+
+message BatteryMeasurements {
+  double state_of_charge_pct = 1;
+  double battery_voltage_v = 2;
+  double battery_current_a = 3;
+  double charge_power_w = 4;
+  double discharge_power_w = 5;
+  double temperature_c = 6;
+  double available_energy_kwh = 7;
+}
+
+message BatteryMonitorSensorRequest {
+  string device_id = 1;
+  string timestamp = 2;
+  int64 sequence = 3;
+  string home_id = 4;
+  BatteryMeasurements measurements = 5;
+  string status = 6;
+}
+
+message BatteryMonitorSensorResponse {
+  string details = 1;
+}
+
+service BatteryMonitorSensorService {
+  rpc SendBatteryMonitorRequest(BatteryMonitorSensorRequest)
+      returns (BatteryMonitorSensorResponse);
+}

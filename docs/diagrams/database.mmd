@@ -1,0 +1,84 @@
+erDiagram
+    USERS ||--o{ HOMES : owns
+    USERS ||--o{ WALLETS : links
+    USERS ||--o{ ENERGY_CREDITS : owns
+    USERS ||--o{ ORDERS : places
+    USERS ||--o{ TRADES : buys
+    USERS ||--o{ REDEMPTIONS : requests
+    HOMES ||--o{ DEVICES : contains
+    DEVICES ||--o{ TELEMETRY_MESSAGES : emits
+    TELEMETRY_MESSAGES ||--o| SMART_METER_READINGS : typed_as
+    TELEMETRY_MESSAGES ||--o| INVERTER_READINGS : typed_as
+    TELEMETRY_MESSAGES ||--o| WEATHER_READINGS : typed_as
+    TELEMETRY_MESSAGES ||--o| BATTERY_READINGS : typed_as
+    HOMES ||--o{ ENERGY_INTERVALS : aggregates
+    ENERGY_INTERVALS ||--o{ ENERGY_INTERVAL_SOURCES : uses
+    ENERGY_INTERVALS ||--o| ENERGY_CREDITS : produces
+    ENERGY_CREDITS ||--o| TOKEN_ISSUANCES : mints
+    ORDERS ||--o{ TRADES : matches
+    WALLETS ||--o{ TOKEN_ISSUANCES : receives
+    WALLETS ||--o{ REDEMPTIONS : funds
+    REDEMPTIONS ||--o| REDEMPTION_SETTLEMENTS : settles
+    BLOCKCHAIN_TRANSACTIONS ||--o{ BLOCKCHAIN_EVENTS : emits
+
+    USERS {
+        uuid id PK
+        string email UK
+        string status
+    }
+    HOMES {
+        uuid id PK
+        uuid owner_id FK
+        string name
+    }
+    DEVICES {
+        uuid id PK
+        uuid home_id FK
+        string device_code UK
+    }
+    TELEMETRY_MESSAGES {
+        uuid id PK
+        uuid device_id FK
+        bigint sequence_number
+        jsonb payload
+    }
+    ENERGY_INTERVALS {
+        uuid id PK
+        uuid home_id FK
+        bigint eligible_export_wh
+    }
+    ENERGY_CREDITS {
+        uuid id PK
+        uuid interval_id FK
+        numeric token_amount
+    }
+    ORDERS {
+        uuid id PK
+        uuid seller_id FK
+        numeric remaining_amount
+    }
+    TRADES {
+        uuid id PK
+        uuid order_id FK
+        uuid buyer_id FK
+    }
+    WALLETS {
+        uuid id PK
+        uuid user_id FK
+        string address UK
+    }
+    REDEMPTIONS {
+        uuid id PK
+        uuid wallet_id FK
+        numeric token_amount
+    }
+    BLOCKCHAIN_TRANSACTIONS {
+        uuid id PK
+        string idempotency_key UK
+        string transaction_hash UK
+    }
+    BLOCKCHAIN_EVENTS {
+        uuid id PK
+        uuid transaction_id FK
+        bigint block_number
+    }

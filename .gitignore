@@ -1,0 +1,47 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+*.log
+.pytest_cache/
+.tox/
+.nox/
+
+# --- Foundry ---
+contracts/lib/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/deployments/*.json
+!contracts/deployments/.gitkeep
+contracts/.env
+contracts/*.secret
+
+# --- Generated gRPC stubs ---
+
+# --- Node / frontend ---
+apps/frontend/node_modules/
+apps/frontend/dist/
+apps/frontend/.next/
+*.tsbuildinfo
+
+# --- Env ---
+.env
+.env.local
+infrastructure/docker/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
