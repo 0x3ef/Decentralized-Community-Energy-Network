@@ -55,11 +55,10 @@ contract SUNTokenTest is Test {
     }
 
     function testAdminCanPauseTransfers() public {
-        vm.prank(admin);
-        token.pause();
-
         vm.prank(minter);
         token.mint(user, 10 ether, creditId);
+        vm.prank(admin);
+        token.pause();
 
         vm.prank(user);
         vm.expectRevert();
@@ -69,12 +68,22 @@ contract SUNTokenTest is Test {
     function testAdminCanGrantMinterRole() public {
         address newMinter = address(0x123);
 
+        bytes32 role = token.MINTER_ROLE();
         vm.prank(admin);
-        token.grantRole(token.MINTER_ROLE(), newMinter);
+        token.grantRole(role, newMinter);
 
         vm.prank(newMinter);
         token.mint(user, 5 ether, creditId);
 
         assertEq(token.balanceOf(user), 5 ether);
+    }
+    function testAccountingAnchorCannotBeOverwritten() public {
+        vm.startPrank(minter);
+        token.mint(user, 5 ether, creditId);
+        bytes32 evidence = keccak256("verified interval and source measurements");
+        token.anchorAccounting(creditId, evidence);
+        assertEq(token.accountingAnchors(creditId), evidence);
+        vm.expectRevert(); token.anchorAccounting(creditId, keccak256("replacement"));
+        vm.stopPrank();
     }
 }

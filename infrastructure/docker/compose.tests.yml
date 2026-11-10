@@ -1,0 +1,25 @@
+name: solar-prototype-tests
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: solar
+      POSTGRES_PASSWORD: solar
+      POSTGRES_DB: solar_tests
+    ports: ["127.0.0.1:55432:5432"]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U solar -d solar_tests"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    command: [mosquitto, -c, /mosquitto-no-auth.conf]
+    ports: ["127.0.0.1:18884:1883"]
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:v1.5.0
+    entrypoint: [anvil, --host, 0.0.0.0, --chain-id, "31337"]
+    ports: ["127.0.0.1:18545:8545"]
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:16379:6379"]

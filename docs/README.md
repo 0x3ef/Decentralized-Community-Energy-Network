@@ -1,3 +1,5 @@
+> Current SUN/USDx implementation and startup: see [the root README](../README.md), [community accounting](COMMUNITY_ACCOUNTING.md) and [verification report](VERIFICATION.md). The following document describes the earlier prototype and may contain superseded commands.
+
 # Solar Energy Market
 
 Community energy marketplace for a solar neighbourhood. IoT sensors

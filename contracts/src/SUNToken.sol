@@ -10,6 +10,8 @@ contract SUNToken is ERC20, ERC20Pausable, ERC20Burnable, AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     mapping(bytes32 => bool) public issuedCredits;
+    mapping(bytes32 => bytes32) public accountingAnchors;
+    event AccountingAnchored(bytes32 indexed creditId, bytes32 indexed evidenceHash);
 
     error ZeroAddress();
     error ZeroAmount();
@@ -53,6 +55,14 @@ contract SUNToken is ERC20, ERC20Pausable, ERC20Burnable, AccessControl {
         _mint(recipient, amount);
 
         emit CreditIssued(creditId, recipient, amount);
+    }
+
+    /// @notice Append one deterministic off-chain accounting commitment.
+    function anchorAccounting(bytes32 creditId, bytes32 evidenceHash) external onlyRole(MINTER_ROLE) {
+        require(issuedCredits[creditId] && evidenceHash != bytes32(0), "invalid anchor");
+        require(accountingAnchors[creditId] == bytes32(0), "anchor already recorded");
+        accountingAnchors[creditId] = evidenceHash;
+        emit AccountingAnchored(creditId, evidenceHash);
     }
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {

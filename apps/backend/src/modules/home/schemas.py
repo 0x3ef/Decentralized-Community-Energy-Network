@@ -12,7 +12,7 @@ class HomeCreateModel(BaseModel):
     country: str = "Colombia"
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
-    timezone: str = "Russia/Moscow"
+    timezone: str = "America/Bogota"
     installed_capacity_w: int = Field(default=0, ge=0)
     has_battery: bool = False
 
@@ -25,9 +25,9 @@ class HomeUpdateModel(BaseModel):
     status: str | None = None
 
 class HomeModel(BaseModel):
+    name: str
     id: uuid.UUID
     owner_id: uuid.UUID
-    name: str
     address: str
     city: str
     country: str

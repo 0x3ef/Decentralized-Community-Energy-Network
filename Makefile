@@ -1,7 +1,8 @@
 .DEFAULT_GOAL := help
 
 ROOT_DIR     := $(shell pwd)
-COMPOSE_FILE := $(ROOT_DIR)/infrastructure/docker/docker-compose.yml
+DEV_TOOLS ?= $(ROOT_DIR)/.dev-tools
+COMPOSE_FILE := $(ROOT_DIR)/infrastructure/docker/compose.prototype.yml
 COMPOSE      := docker compose -f $(COMPOSE_FILE)
 
 .PHONY: help setup up down logs ps build migrate seed test test-contracts test-iot \
@@ -33,19 +34,18 @@ seed: ## Load SQL seeds into the running DB
 	./scripts/seed_db.sh
 
 migrate: ## Apply Alembic migrations to the running DB
-	$(COMPOSE) run --rm migrator
+	$(COMPOSE) run --rm migrate
 
-test: ## Run every test suite (unit only)
-	./scripts/test.sh
+test: test-contracts test-backend test-iot ## Run contract, backend and IoT verification
 
 test-contracts: ## Run Foundry tests
-	cd contracts && forge test -vvv
+	$(DEV_TOOLS)/node_modules/.bin/forge test --root contracts --use $(DEV_TOOLS)/solc-0.8.24
 
 test-iot: ## Run iot unit tests
-	cd iot && make test
+	./scripts/test_iot.sh
 
 test-backend: ## Run backend unit tests in Docker
-	$(COMPOSE) run --rm tests -m "not integration"
+	./scripts/test_backend.sh
 
 lint: ## Run ruff on backend and iot
 	cd apps/backend && ruff check .
@@ -60,7 +60,7 @@ typecheck: ## Run mypy on backend and iot
 	cd iot && mypy .
 
 contracts-deploy: ## Deploy contracts to the running Anvil
-	./scripts/deploy.sh contracts
+	@echo "Run scripts/deploy.sh COMMUNITY_UUID for a registered community"
 
 clean: ## Stop the stack and delete volumes + build artifacts
 	$(COMPOSE) down -v

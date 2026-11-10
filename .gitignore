@@ -45,3 +45,6 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+# Local development tooling and credentials
+.venv/
+.dev-tools/
