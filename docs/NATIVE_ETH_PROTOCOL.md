@@ -130,9 +130,9 @@ Authenticated API under `/api/v1/communities`:
   in base units; retirement amount is integer Wh. Preparation never submits a
   transaction or records a payment as confirmed.
 
-Batch submission, governance scheduling, proof generation, issuance and reservation
-currently use direct contract tooling; the UI does not automate the verifier or
-replace its evidence review. Use `leaf` on settlement/vault to construct leaves:
+The [automated backend pipeline](AUTOMATED_SETTLEMENT.md) now prepares proofs,
+submits batches, indexes confirmations and executes funded allocations. Governance
+finalization and user wallet actions remain explicit. Use `leaf` on settlement/vault to construct leaves:
 kind 0 issuance, 1 retirement, 2 financial allocation; each is double-keccak ABI
 encoding, with sorted-pair Merkle branches. Claim/batch IDs and proof nodes are
 bytes32. Use the final ABI JSON files in backend blockchain/abis, not legacy ABIs.

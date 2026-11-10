@@ -2,7 +2,9 @@
 
 **Current governed protocol:** SUN energy credits plus native Anvil/Sepolia test ETH.
 Community creation grants no operator privileges. See [native ETH protocol](docs/NATIVE_ETH_PROTOCOL.md)
-for deployment, authority, API interactions, tests and limitations. The earlier
+for deployment, authority, API interactions, tests and limitations. The
+[automated backend pipeline](docs/AUTOMATED_SETTLEMENT.md) covers interval allocation,
+durable workers, ETH obligations and participant APIs. The earlier
 USDx workflow below is historical compatibility documentation and must not be
 used to bootstrap a new governed deployment.
 

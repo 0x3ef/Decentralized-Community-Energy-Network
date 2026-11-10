@@ -107,3 +107,11 @@ No public Sepolia broadcast or independent audit was performed. Verifier batch
 construction, governance scheduling and allocation reservations use direct
 contract tooling; no automated physical-truth oracle is claimed. See
 [NATIVE_ETH_PROTOCOL.md](NATIVE_ETH_PROTOCOL.md) for exact trust assumptions.
+
+
+## Automated backend settlement
+
+See [SETTLEMENT_VERIFICATION.md](SETTLEMENT_VERIFICATION.md) for the 28-test backend
+suite, real contract end-to-end scenario, reorganization/crash recovery and
+current implementation limits. [AUTOMATED_SETTLEMENT.md](AUTOMATED_SETTLEMENT.md)
+documents configuration, native APIs, worker operation and exact accounting.
