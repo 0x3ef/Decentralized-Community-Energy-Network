@@ -1,8 +1,9 @@
 import {lazy,Suspense} from 'react'
+const NativeSettlement=lazy(()=>import('./features/workspace/NativeSettlement'))
 const LiveHomes=lazy(()=>import('./features/workspace/Pages').then(m=>({default:m.Homes})))
 const LiveEnergy=lazy(()=>import('./features/workspace/Pages').then(m=>({default:m.Energy})))
 const LiveCredits=lazy(()=>import('./features/workspace/Pages').then(m=>({default:m.Credits})))
-import {CommunitySelect,ConnectedOverview,ConnectedSettlement,ConnectedHistory} from './features/workspace/Connected'
+import {CommunitySelect,ConnectedOverview,ConnectedHistory} from './features/workspace/Connected'
 import { useState } from 'react'
 import CommunityPage from './CommunityPage'
 import type { ReactNode } from 'react'
@@ -31,7 +32,7 @@ function AppLayout() {
   const navigate = useNavigate()
   const links = [
     ['Dashboard', '/dashboard', BarChart3], ['My Homes', '/homes', Home], ['Energy Monitoring', '/energy', Zap],
-    ['Community Settlement', '/community', Blocks], ['Energy Credits', '/credits', CreditCard], ['Marketplace', '/marketplace', ShoppingCart],
+    ['Community proposals', '/community', Blocks], ['Energy Credits', '/credits', CreditCard], ['ETH settlement', '/native', ShoppingCart],
     ['My Orders', '/orders', Activity], ['My Trades', '/trades', ArrowRight], ['Wallet', '/wallet', WalletCards],
     ['Compensation & settlement', '/redemptions', RefreshCw], ['Blockchain', '/blockchain', Blocks], ['Settings', '/settings', Settings],
   ] as const
@@ -79,4 +80,4 @@ function Field({ label, type = 'text', value, onChange, required }: { label: str
 function Notice({ tone = 'info', children }: { tone?: 'info' | 'error' | 'success'; children: ReactNode }) { return <div className={`notice ${tone}`}>{children}</div> }
 function PageHeader({ eyebrow, title, description, action }: { eyebrow?: string; title: string; description?: string; action?: React.ReactNode }) { return <div className="page-header"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h1>{title}</h1>{description && <p className="muted">{description}</p>}</div>{action}</div> }
 function SettingsPage() { const { user } = useAuth(); return <><PageHeader eyebrow="ACCOUNT" title="Settings" description="Your account identity and session information." /><section className="panel settings-card"><div className="avatar large">{user?.full_name?.slice(0, 1).toUpperCase()}</div><div><h2>{user?.full_name}</h2><p className="muted">{user?.email}</p><span className="pill success">{user?.status}</span></div></section></> }
-export default function App() { return <BrowserRouter><Suspense fallback={<p role="status">Loading view…</p>}><Routes><Route element={<AuthLayout />}><Route path="/login" element={<Login />} /><Route path="/register" element={<Register />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /></Route><Route element={<Protected />}><Route element={<AppLayout />}><Route index element={<Navigate to="/community" replace />} /><Route path="/dashboard" element={<ConnectedOverview />} /><Route path="/community" element={<CommunityPage />} /><Route path="/homes" element={<LiveHomes />} /><Route path="/energy" element={<LiveEnergy />} /><Route path="/credits" element={<LiveCredits />} /><Route path="/marketplace" element={<CommunityPage />} /><Route path="/orders" element={<ConnectedHistory />} /><Route path="/trades" element={<ConnectedSettlement />} /><Route path="/wallet" element={<CommunityPage />} /><Route path="/redemptions" element={<ConnectedSettlement />} /><Route path="/blockchain" element={<ConnectedHistory />} /><Route path="/settings" element={<SettingsPage />} /></Route></Route><Route path="*" element={<Navigate to="/" replace />} /></Routes></Suspense></BrowserRouter> }
+export default function App() { return <BrowserRouter><Suspense fallback={<p role="status">Loading view…</p>}><Routes><Route element={<AuthLayout />}><Route path="/login" element={<Login />} /><Route path="/register" element={<Register />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /></Route><Route element={<Protected />}><Route element={<AppLayout />}><Route index element={<Navigate to="/community" replace />} /><Route path="/dashboard" element={<ConnectedOverview />} /><Route path="/community" element={<CommunityPage />} /><Route path="/native" element={<NativeSettlement />} /><Route path="/homes" element={<LiveHomes />} /><Route path="/energy" element={<LiveEnergy />} /><Route path="/credits" element={<LiveCredits />} /><Route path="/marketplace" element={<NativeSettlement />} /><Route path="/orders" element={<ConnectedHistory />} /><Route path="/trades" element={<NativeSettlement />} /><Route path="/wallet" element={<NativeSettlement />} /><Route path="/redemptions" element={<NativeSettlement />} /><Route path="/blockchain" element={<ConnectedHistory />} /><Route path="/settings" element={<SettingsPage />} /></Route></Route><Route path="*" element={<Navigate to="/" replace />} /></Routes></Suspense></BrowserRouter> }

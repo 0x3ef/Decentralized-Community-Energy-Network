@@ -89,3 +89,21 @@ No external credentials or access blockers remain for the verified local workflo
 The earlier onboarding draft service failed to save environment configuration;
 this coding deliverable does not claim that reusable cloud settings were saved or
 published. Installation and startup commands are retained in repository scripts.
+
+
+## Governed native ETH protocol, 2026-11-10
+
+Executed locally: 38 Foundry tests (including 256 fuzz runs for vault liabilities),
+18 backend tests against PostgreSQL/Redis/Anvil, 66 IoT tests with 83.28% coverage,
+15 frontend tests, TypeScript/Vite production build, and 2 Chromium browser tests
+against the running API. Fresh test databases migrate through native vault schema;
+the development stack migration also completed. Governance API tests deploy real
+TimelockController, registry, SUN, settlement and vault contracts, verify deployment
+approval, deposit native ETH through prepared user calldata, and preserve safe
+withdrawal after suspension. Browser tests cover proposal submission, disabled
+unconfigured deposits, protected routes and mobile navigation.
+
+No public Sepolia broadcast or independent audit was performed. Verifier batch
+construction, governance scheduling and allocation reservations use direct
+contract tooling; no automated physical-truth oracle is claimed. See
+[NATIVE_ETH_PROTOCOL.md](NATIVE_ETH_PROTOCOL.md) for exact trust assumptions.

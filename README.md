@@ -1,5 +1,11 @@
 # Solar Energy Market
 
+**Current governed protocol:** SUN energy credits plus native Anvil/Sepolia test ETH.
+Community creation grants no operator privileges. See [native ETH protocol](docs/NATIVE_ETH_PROTOCOL.md)
+for deployment, authority, API interactions, tests and limitations. The earlier
+USDx workflow below is historical compatibility documentation and must not be
+used to bootstrap a new governed deployment.
+
 A local development prototype for community energy accounting, SUN credits,
 atomic SUN/USDx trading, and consumption compensation. Electricity is delivered
 by the physical network; token transfers change accounting rights only.
