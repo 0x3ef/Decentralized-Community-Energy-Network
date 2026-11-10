@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local fixture session credentials
+e2e/.native-fixture.json
