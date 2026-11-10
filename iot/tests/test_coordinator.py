@@ -25,9 +25,7 @@ def generators() -> dict[SensorType, object]:
     }
 
 
-def test_duplicate_homes_rejected(
-    sample_home: Home, generators
-) -> None:
+def test_duplicate_homes_rejected(sample_home: Home, generators) -> None:
     with pytest.raises(ValueError, match="Duplicate home IDs"):
         Simulator(homes=[sample_home, sample_home], generators=generators)
 
@@ -43,18 +41,14 @@ def test_cycle_returns_messages(sample_home: Home, generators) -> None:
     assert all("sequence_number" in m for m in messages)
 
 
-def test_sequence_numbers_increase(
-    sample_home: Home, generators
-) -> None:
+def test_sequence_numbers_increase(sample_home: Home, generators) -> None:
     simulator = Simulator(homes=[sample_home], generators=generators)
     simulator.simulate_cycle()
     messages = simulator.simulate_cycle()
     assert all(m["sequence_number"] == 2 for m in messages)
 
 
-def test_sequence_offset_prevents_replay(
-    sample_home: Home, generators
-) -> None:
+def test_sequence_offset_prevents_replay(sample_home: Home, generators) -> None:
     simulator = Simulator(
         homes=[sample_home],
         generators=generators,
@@ -86,3 +80,31 @@ def test_publisher_is_called(sample_home: Home, generators) -> None:
     simulator.simulate_cycle()
     assert len(calls) == len(sample_home.devices)
     assert calls[0][0].startswith("solar/HOME-TEST-001/")
+
+
+def test_failed_publish_retries_original_sequence_before_new_measurements(
+    sample_home, generators
+):
+    class Unreliable:
+        fail = True
+
+        def publish(self, topic, message):
+            if self.fail:
+                raise ConnectionError("broker unavailable")
+
+        def close(self):
+            pass
+
+    publisher = Unreliable()
+    simulator = Simulator([sample_home], generators, publisher)
+    assert simulator.simulate_cycle() == []
+    pending = {
+        code: message["sequence_number"] for code, message in simulator._pending.items()
+    }
+    publisher.fail = False
+    recovered = simulator.simulate_cycle()
+    assert recovered and not simulator._pending
+    assert all(
+        message["sequence_number"] == pending[message["device_id"]]
+        for message in recovered
+    )

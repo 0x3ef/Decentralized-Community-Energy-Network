@@ -1,0 +1,22 @@
+# Use with compose.prototype.yml. Provision the registry and credentials first.
+services:
+  simulator:
+    profiles: [simulation]
+    build:
+      context: ../../iot
+      dockerfile: Dockerfile
+      target: simulator
+      secrets: [proxy_ca]
+    environment:
+      USE_GRPC: 'false'
+      MQTT_HOST: mosquitto
+      DEVICE_REGISTRY: /run/simulation/registry.json
+      CHECKPOINT_PATH: /state/simulator.json
+      # The registry references env binding names, never embedded credentials.
+    env_file: ${SIMULATOR_ENV_FILE:?Set the path to a private simulator environment file}
+    volumes:
+      - ${SIMULATOR_REGISTRY_FILE:?Set the path to the provisioned registry}:/run/simulation/registry.json:ro
+      - simulation_state:/state
+    depends_on: [mosquitto, subscriber]
+volumes:
+  simulation_state:

@@ -39,7 +39,13 @@ class MqttPublisher:
         ca_cert: str | None = None,
         client_cert: str | None = None,
         client_key: str | None = None,
+        username: str | None = None,
+        password: str | None = None,
+        publish_timeout: float = 10,
     ) -> None:
+        if qos not in (1, 2):
+            raise ValueError("Durable telemetry requires QoS 1 or 2")
+        self._timeout = publish_timeout
         self._qos = qos
         self._lock = Lock()
 
@@ -48,11 +54,14 @@ class MqttPublisher:
             client_id=client_id,
         )
 
+        self._client.reconnect_delay_set(min_delay=1, max_delay=30)
+        self._client.max_queued_messages_set(1000)
+        if username:
+            self._client.username_pw_set(username, password)
+
         if tls:
-            if not (ca_cert and client_cert and client_key):
-                raise ValueError(
-                    "TLS requires ca_cert, client_cert and client_key"
-                )
+            if not ca_cert or bool(client_cert) != bool(client_key):
+                raise ValueError("TLS requires a CA certificate and a complete optional client certificate/key pair")
             self._client.tls_set(
                 ca_certs=ca_cert,
                 certfile=client_cert,
@@ -67,7 +76,11 @@ class MqttPublisher:
         self._client.loop_start()
 
     def _on_connect(
-        self, client: mqtt.Client, userdata: Any, flags: Any, rc: int,
+        self,
+        client: mqtt.Client,
+        userdata: Any,
+        flags: Any,
+        rc: int,
         properties: Any = None,
     ) -> None:
         if rc == 0:
@@ -76,20 +89,39 @@ class MqttPublisher:
             logger.error("MQTT connection failed (rc=%s)", rc)
 
     def _on_disconnect(
-        self, client: mqtt.Client, userdata: Any, flags: Any, rc: int,
+        self,
+        client: mqtt.Client,
+        userdata: Any,
+        flags: Any,
+        rc: int,
         properties: Any = None,
     ) -> None:
         logger.warning("MQTT disconnected (rc=%s)", rc)
 
     def publish(self, topic: str, message: dict[str, Any]) -> None:
         """Validate ``message`` and publish it as JSON to ``topic``."""
-        payload_model = TelemetryPayload.model_validate(message)
-        payload = json.dumps(payload_model.to_mqtt_payload(), default=str)
+        expected = f"solar/{message['home_id']}/{message['device_id']}/telemetry"
+        if topic != expected:
+            raise ValueError("Telemetry topic does not match device identity")
+        payload_model = TelemetryPayload.model_validate(
+            {k: v for k, v in message.items() if k != "credential"}
+        )
+        envelope = payload_model.to_mqtt_payload()
+        if "credential" in message:
+            envelope["credential"] = message["credential"]
+        payload = json.dumps(envelope, default=str)
+        if len(payload.encode()) > 65536:
+            raise ValueError("Telemetry payload exceeds 64 KiB")
 
         with self._lock:
             info = self._client.publish(topic, payload, qos=self._qos)
         if info.rc != mqtt.MQTT_ERR_SUCCESS:
-            logger.error("Publish failed to %s (rc=%s)", topic, info.rc)
+            raise ConnectionError(f"MQTT publish was not accepted (rc={info.rc})")
+        info.wait_for_publish(timeout=self._timeout)
+        if not info.is_published():
+            raise TimeoutError(
+                "MQTT acknowledgement timed out; preserve sequence and retry"
+            )
 
     def close(self) -> None:
         """Stop the network loop and disconnect."""

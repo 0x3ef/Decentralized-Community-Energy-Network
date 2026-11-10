@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 import signal
 import time
 from contextlib import suppress
@@ -61,18 +62,59 @@ def main() -> None:
         ),
     }
 
+    publisher = None
+    if not settings.use_grpc:
+        if settings.device_registry:
+            from publishers.registered import RegisteredPublisher
+            from publishers.mqtt_publisher import MqttPublisher
+
+            publisher = RegisteredPublisher(
+                MqttPublisher(
+                    settings.mqtt_host,
+                    settings.mqtt_port,
+                    client_id="solar-registered-simulator",
+                    username=settings.mqtt_username,
+                    password=settings.mqtt_password,
+                    tls=settings.mqtt_tls,
+                    ca_cert=settings.mqtt_ca_cert,
+                    client_cert=settings.mqtt_client_cert,
+                    client_key=settings.mqtt_client_key,
+                ),
+                settings.device_registry,
+            )
+        else:
+            from publishers.console_publisher import ConsolePublisher
+
+            publisher = ConsolePublisher()
+    import json
+    from simulator.physics import HomeProfile
+
+    profiles = {
+        key: HomeProfile(
+            **{
+                k: Decimal(str(v))
+                if k not in ("latitude", "longitude", "timezone")
+                else v
+                for k, v in value.items()
+            }
+        )
+        for key, value in json.loads(settings.home_profiles_json).items()
+    }
     simulator = Simulator(
+        profiles=profiles,
         homes=build_default_homes(),
         generators=generators,
-        publisher=None,  # The gateway owns MQTT delivery.
+        publisher=publisher,
         config=SimulationConfig(
             interval_seconds=settings.interval_seconds,
+            random_seed=settings.random_seed,
+            checkpoint_path=settings.checkpoint_path,
             # A fresh process must not replay low sequence numbers because
             # the backend intentionally deduplicates by device and sequence.
             sequence_offset=(
                 settings.sequence_offset
                 if settings.sequence_offset is not None
-                else int(time.time())
+                else int(time.time() * 1000)
             ),
         ),
     )
@@ -84,8 +126,11 @@ def main() -> None:
         simulator.run(stop_event=stop_event)
     finally:
         close_channel()
+        if publisher is not None:
+            publisher.close()
 
     print("Shutting down multi-home IoT simulator...")
+
 
 if __name__ == "__main__":
     print("Starting multi-home IoT simulator...")

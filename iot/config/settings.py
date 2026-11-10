@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     )
 
     interval_seconds: float = Field(default=15.0, gt=0)
+    checkpoint_path: str | None = None
+    device_registry: str | None = None
+    home_profiles_json: str = "{}"
+    mqtt_tls: bool = False
+    mqtt_ca_cert: str | None = None
+    mqtt_client_cert: str | None = None
+    mqtt_client_key: str | None = None
+    mqtt_username: str | None = None
+    mqtt_password: str | None = None
     random_seed: int | None = None
     sequence_offset: int | None = None
     use_grpc: bool = True
