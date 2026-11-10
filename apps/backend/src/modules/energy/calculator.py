@@ -20,7 +20,7 @@ class EnergyDeltas:
 class EnergyCalculator:
     """Calculate energy deltas and export eligibility without database access."""
 
-    VERSION = "v1"
+    VERSION = "v2-authoritative-export"
 
     @staticmethod
     def counter_delta(previous_wh: int | None, current_wh: int | None) -> int:
@@ -41,17 +41,17 @@ class EnergyCalculator:
         consumption_wh: int,
         grid_export_wh: int,
     ) -> int:
-        """Conservatively cap eligible export by measured grid export and net generation."""
-        net_surplus = max(0, generation_wh - consumption_wh)
-        return max(0, min(grid_export_wh, net_surplus))
+        """Authoritative export metering determines injection, not generation."""
+        return max(0, grid_export_wh)
 
     @staticmethod
     def interval_bounds(measured_at, minutes: int = 15):
         """Return UTC-aligned interval bounds for a timestamp."""
-        from datetime import timedelta
+        from datetime import timedelta, timezone
 
         if measured_at.tzinfo is None:
             raise ValueError("measured_at must be timezone-aware")
+        measured_at = measured_at.astimezone(timezone.utc)
         start_minute = (measured_at.minute // minutes) * minutes
         start = measured_at.replace(
             minute=start_minute, second=0, microsecond=0

@@ -844,3 +844,13 @@ class AuditEvent(SQLModel, table=True):
         sa_type=DateTime(timezone=True),
         nullable=False,
     )
+
+
+class EnergyPowerSnapshot(SQLModel, table=True):
+    """Previous battery power sample for explicit trapezoidal integration."""
+    __tablename__ = "energy_power_snapshots"
+    __table_args__ = (CheckConstraint("power_w >= 0", name="ck_energy_power_nonnegative"),)
+    device_id: uuid.UUID = Field(foreign_key="devices.id", primary_key=True)
+    channel: str = Field(max_length=30, primary_key=True)
+    power_w: Decimal = Field(sa_column=Column(Numeric(18, 6), nullable=False))
+    measured_at: datetime = Field(sa_column=Column(DateTime(timezone=True), nullable=False))

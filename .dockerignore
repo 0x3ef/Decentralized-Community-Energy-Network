@@ -1,0 +1,14 @@
+.git
+**/.git
+**/node_modules
+**/dist
+**/__pycache__
+**/.pytest_cache
+**/.coverage
+**/coverage.xml
+**/*.egg-info
+**/.env
+**/.env.local
+contracts/lib
+contracts/out
+contracts/cache

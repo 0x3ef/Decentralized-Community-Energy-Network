@@ -59,6 +59,8 @@ class Home(SQLModel, table=True):
         index=True,
     )
 
+    name: str = Field(default="Home", max_length=100)
+
     address: str = Field(
         sa_column=Column(String(255), nullable=False)
     )

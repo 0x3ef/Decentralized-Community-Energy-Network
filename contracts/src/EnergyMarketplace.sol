@@ -1,152 +1,116 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
-/// @title EnergyMarketplace
-/// @notice Escrow-based sell orders for SUN with atomic native-token settlement.
-/// @dev Buyers call fillOrder themselves. The backend must not pay on behalf of
-///      a buyer unless a separate signed-authorization design is implemented.
-contract EnergyMarketplace is ReentrancyGuard {
+/// @notice Community-scoped SUN escrow with atomic simulated USDx payment.
+/// @dev Each deployment serves one community. Generic ERC20 transfers do not
+/// enforce community provenance; compensation additionally requires an attestation.
+contract EnergyMarketplace is ReentrancyGuard, AccessControl {
     using SafeERC20 for IERC20;
-
-    enum OrderType { Sell, Buy }
-
+    using EnumerableSet for EnumerableSet.UintSet;
+    EnumerableSet.UintSet private activeOrders;
+    uint256 public constant MAX_ACTIVE_ORDERS = 128;
     struct Order {
-        uint256 id;
-        address maker;
-        OrderType orderType;
-        uint256 amount;
-        uint256 pricePerToken;
-        uint256 remaining;
-        bool active;
-        uint256 createdAt;
+        uint256 id; address maker; uint256 amount; uint256 pricePerToken;
+        uint256 remaining; bool active; uint256 createdAt; uint256 expiresAt;
     }
-
     IERC20 public immutable sunToken;
-    address public owner;
+    IERC20 public immutable paymentToken;
+    uint256 public immutable sunUnit;
+    bytes32 public immutable communityId;
     uint256 public nextOrderId;
+    mapping(address => bool) public members;
     mapping(uint256 => Order) public orders;
-
-    event OrderPlaced(
-        uint256 indexed orderId,
-        address indexed maker,
-        OrderType orderType,
-        uint256 amount,
-        uint256 pricePerToken
-    );
-    event OrderFilled(
-        uint256 indexed orderId,
-        address indexed buyer,
-        uint256 amount,
-        uint256 totalPaid
-    );
+    event MembershipUpdated(address indexed member, bool authorized);
+    event OrderPlaced(uint256 indexed orderId, address indexed maker, uint256 amount, uint256 pricePerToken, uint256 expiresAt);
+    event OrderFilled(uint256 indexed orderId, address indexed buyer, address indexed seller, uint256 amount, uint256 totalPaid);
     event OrderCancelled(uint256 indexed orderId);
-
-    error NotOwner();
-    error NotMaker();
-    error InvalidAddress();
-    error InvalidAmount();
-    error InvalidPrice();
-    error OrderNotActive();
-    error InsufficientPayment();
-    error TransferFailed();
-    error BuyerMustBeCaller();
-
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert NotOwner();
-        _;
+    constructor(address sun, address payment, bytes32 community, address admin) {
+        require(sun != address(0) && payment != address(0) && sun != payment && admin != address(0), "invalid address");
+        require(community != bytes32(0), "invalid community");
+        sunToken = IERC20(sun); paymentToken = IERC20(payment);
+        uint8 precision = IERC20Metadata(sun).decimals();
+        require(precision <= 36, "unsupported decimals");
+        sunUnit = 10 ** precision; communityId = community;
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
     }
-
-    constructor(address tokenAddress) {
-        if (tokenAddress == address(0)) revert InvalidAddress();
-        sunToken = IERC20(tokenAddress);
-        owner = msg.sender;
+    function setMember(address member, bool authorized) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(member != address(0), "zero member");
+        members[member] = authorized; emit MembershipUpdated(member, authorized);
     }
-
-    function placeSellOrder(
-        uint256 amount,
-        uint256 pricePerToken
-    ) external nonReentrant returns (uint256) {
-        if (amount == 0) revert InvalidAmount();
-        if (pricePerToken == 0) revert InvalidPrice();
-
-        uint256 orderId = nextOrderId++;
-        orders[orderId] = Order({
-            id: orderId,
-            maker: msg.sender,
-            orderType: OrderType.Sell,
-            amount: amount,
-            pricePerToken: pricePerToken,
-            remaining: amount,
-            active: true,
-            createdAt: block.timestamp
-        });
-
+    /// @param pricePerToken USDx base units per whole SUN; no ETH conversion.
+    function placeSellOrder(uint256 amount, uint256 pricePerToken, uint256 expiresAt) external nonReentrant returns (uint256 id) {
+        require(members[msg.sender], "unauthorized member");
+        require(amount > 0 && pricePerToken > 0 && expiresAt > block.timestamp, "invalid order");
+        require(activeOrders.length() < MAX_ACTIVE_ORDERS, "community order capacity reached");
+        id = nextOrderId++;
+        activeOrders.add(id);
+        orders[id] = Order(id, msg.sender, amount, pricePerToken, amount, true, block.timestamp, expiresAt);
         sunToken.safeTransferFrom(msg.sender, address(this), amount);
-        emit OrderPlaced(
-            orderId, msg.sender, OrderType.Sell, amount, pricePerToken
-        );
-        return orderId;
+        emit OrderPlaced(id, msg.sender, amount, pricePerToken, expiresAt);
     }
-
-    function cancelOrder(uint256 orderId) external nonReentrant {
-        Order storage order = orders[orderId];
-        if (order.maker != msg.sender) revert NotMaker();
-        if (!order.active) revert OrderNotActive();
-
+    function cancelOrder(uint256 id) external nonReentrant {
+        Order storage order = orders[id];
+        require(order.maker == msg.sender, "not maker");
+        _cancel(order);
+    }
+    function expireOrder(uint256 id) external nonReentrant {
+        Order storage order = orders[id];
+        require(block.timestamp >= order.expiresAt, "not expired");
+        _cancel(order);
+    }
+    function _cancel(Order storage order) private {
+        require(order.active, "inactive");
         order.active = false;
-        uint256 refund = order.remaining;
-        order.remaining = 0;
-        if (refund > 0) sunToken.safeTransfer(msg.sender, refund);
-        emit OrderCancelled(orderId);
+        activeOrders.remove(order.id);
+        uint256 refund = order.remaining; order.remaining = 0;
+        sunToken.safeTransfer(order.maker, refund);
+        emit OrderCancelled(order.id);
     }
-
-    /// @notice Buy part or all of an escrowed sell order.
-    /// @dev pricePerToken is wei per whole SUN token (18 decimals).
-    function fillOrder(
-        uint256 orderId,
-        uint256 fillAmount,
-        address buyer
-    ) external payable nonReentrant {
-        if (buyer != msg.sender) revert BuyerMustBeCaller();
-
-        Order storage order = orders[orderId];
-        if (!order.active) revert OrderNotActive();
-        if (fillAmount == 0 || fillAmount > order.remaining) {
-            revert InvalidAmount();
+    function quote(uint256 id, uint256 amount) public view returns (uint256) {
+        // Round up so fractional fills never receive unpaid SUN dust.
+        return Math.mulDiv(amount, orders[id].pricePerToken, sunUnit, Math.Rounding.Ceil);
+    }
+    function fillOrder(uint256 id, uint256 amount) external nonReentrant {
+        _fillOrder(id, amount);
+    }
+    /// @notice Match the lowest-price eligible SELL order, then earliest order ID.
+    /// @dev The bounded active book prevents an unbounded historical-order scan.
+    function bestOrder(address buyer) public view returns (uint256 id, bool found) {
+        uint256 bestPrice = type(uint256).max;
+        for (uint256 i; i < activeOrders.length(); ++i) {
+            uint256 candidate = activeOrders.at(i);
+            Order storage item = orders[candidate];
+            if (item.maker == buyer || !members[item.maker] || block.timestamp >= item.expiresAt) continue;
+            if (!found || item.pricePerToken < bestPrice || (item.pricePerToken == bestPrice && candidate < id)) {
+                id = candidate; bestPrice = item.pricePerToken; found = true;
+            }
         }
-
-        uint256 totalCost = (fillAmount * order.pricePerToken) / 1e18;
-        if (totalCost == 0 || msg.value < totalCost) {
-            revert InsufficientPayment();
-        }
-
-        order.remaining -= fillAmount;
-        if (order.remaining == 0) order.active = false;
-
-        sunToken.safeTransfer(buyer, fillAmount);
-
-        (bool paid,) = payable(order.maker).call{value: totalCost}("");
-        if (!paid) revert TransferFailed();
-
-        if (msg.value > totalCost) {
-            (bool refunded,) = payable(msg.sender).call{
-                value: msg.value - totalCost
-            }("");
-            if (!refunded) revert TransferFailed();
-        }
-
-        emit OrderFilled(orderId, buyer, fillAmount, totalCost);
     }
-
-    function getOrder(uint256 orderId) external view returns (Order memory) {
-        return orders[orderId];
+    function fillBestOrder(uint256 amount, uint256 maxPricePerToken) external nonReentrant {
+        (uint256 id, bool found) = bestOrder(msg.sender);
+        require(found && orders[id].pricePerToken <= maxPricePerToken, "no acceptable order");
+        _fillOrder(id, amount);
     }
-
-    function isActive(uint256 orderId) external view returns (bool) {
-        return orders[orderId].active;
+    function activeOrderIds() external view returns (uint256[] memory) { return activeOrders.values(); }
+    function _fillOrder(uint256 id, uint256 amount) private {
+        Order storage order = orders[id];
+        require(members[msg.sender] && members[order.maker], "unauthorized member");
+        require(order.active && block.timestamp < order.expiresAt, "inactive or expired");
+        require(msg.sender != order.maker && amount > 0 && amount <= order.remaining, "invalid fill");
+        uint256 cost = quote(id, amount);
+        order.remaining -= amount;
+        if (order.remaining == 0) { order.active = false; activeOrders.remove(id); }
+        paymentToken.safeTransferFrom(msg.sender, order.maker, cost);
+        sunToken.safeTransfer(msg.sender, amount);
+        emit OrderFilled(id, msg.sender, order.maker, amount, cost);
     }
+    function getOrder(uint256 id) external view returns (Order memory) { return orders[id]; }
+    function isActive(uint256 id) external view returns (bool) { return orders[id].active && block.timestamp < orders[id].expiresAt; }
 }

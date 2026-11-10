@@ -24,8 +24,7 @@ home_service = HomeService()
 role_checker = RoleChecker(["admin", "user"])
 
 @home_router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_home(home_data: HomeCreateModel, session: AsyncSession = Depends(get_session), _: bool = Depends(role_checker)):
-    user = await get_current_user()
+async def create_home(home_data: HomeCreateModel, user=Depends(get_current_user), session: AsyncSession = Depends(get_session), _: bool = Depends(role_checker)):
     home = await home_service.create_home(user, home_data, session)
 
     return {"message": "Home created successfully", "home": home}
@@ -71,6 +70,6 @@ async def delete_home(home_id: str, user = Depends(get_current_user), session: A
             detail="Home not found",
         )
 
-    await home_service.delete_home(home, session)
+    await home_service.delete_home(user, home_id, session)
 
     return {"message": "Home deleted successfully"}

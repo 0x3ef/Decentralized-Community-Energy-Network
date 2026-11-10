@@ -58,6 +58,8 @@ class Device(SQLModel, table=True):
         ),
     )
 
+    device_code: Optional[str] = Field(default=None, max_length=100, unique=True)
+
     device_type: str = Field(
         sa_column=Column(String(30), nullable=False)
     )

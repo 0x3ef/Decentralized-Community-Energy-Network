@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import hashlib
+import hmac
 import logging
 import signal
 import uuid
@@ -32,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.db import AsyncSessionFactory, dispose_engine
 from src.core.config import Config
 
+from src.modules.community.models import MeterAuthorization, CommunityNode
 from src.modules.device.models import (
     Device,
     SmartMeter,
@@ -59,7 +62,9 @@ class MqttIngestWorker:
 
         self._client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
-            client_id=Config.MQTT_CLIENT_ID
+            client_id=Config.MQTT_CLIENT_ID,
+            clean_session=False,
+            manual_ack=True,
         )
         self._client.on_connect = self._on_connect
         self._client.on_disconnect = self._on_disconnect
@@ -103,8 +108,16 @@ class MqttIngestWorker:
         try:
             payload = json.loads(msg.payload)
         except json.JSONDecodeError:
-            logger.exception("Malformed JSON on %s", msg.topic)
+            logger.warning("Malformed JSON on %s", msg.topic)
+            client.ack(msg.mid, msg.qos)
             return
+        if not isinstance(payload, dict):
+            logger.warning("MQTT payload must be a JSON object")
+            client.ack(msg.mid, msg.qos)
+            return
+        payload["_mqtt_mid"] = msg.mid
+        payload["_mqtt_qos"] = msg.qos
+        payload["_mqtt_topic"] = msg.topic
         self._loop.call_soon_threadsafe(self._enqueue, payload)
 
     def _enqueue(self, payload: dict[str, Any]) -> None:
@@ -112,7 +125,7 @@ class MqttIngestWorker:
             self._queue.put_nowait(payload)
         except asyncio.QueueFull:
             logger.error(
-                "Ingest queue full (max=%d); dropping message",
+                "Ingest queue full (max=%d); message remains unacknowledged for broker retry",
                 self._queue.maxsize,
             )
 
@@ -143,13 +156,21 @@ class MqttIngestWorker:
         return batch
 
     async def _persist(self, batch: list[dict[str, Any]]) -> None:
-        try:
-            async with self._session_factory() as session:
-                inserted, skipped = await _insert_batch(session, batch)
-                await session.commit()
-            logger.info("Batch persisted: %d inserted, %d skipped", inserted, skipped)
-        except Exception:
-            logger.exception("Failed to persist batch of %d", len(batch))
+        delay = 1
+        while not self._stop.is_set():
+            try:
+                async with self._session_factory() as session:
+                    inserted, skipped = await _insert_batch(session, batch)
+                    await session.commit()
+                for payload in batch:
+                    if "_mqtt_mid" in payload:
+                        self._client.ack(payload["_mqtt_mid"], payload["_mqtt_qos"])
+                logger.info("Batch persisted: %d inserted, %d skipped", inserted, skipped)
+                return
+            except Exception:
+                logger.exception("Database batch failed; retrying in %s seconds", delay)
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 30)
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -199,12 +220,25 @@ async def _insert_batch(
     """
     prepared: list[tuple[Envelope, uuid.UUID, list[dict[str, Any]]]] = []
     for raw in messages:
-        envelope, errors = validate_envelope(raw)
+        clean = {k: v for k, v in raw.items() if k != "credential" and not k.startswith("_mqtt_")}
+        envelope, errors = validate_envelope(clean)
         if envelope is None:
             logger.warning("Dropping malformed envelope: %s", errors)
             continue
         try:
             device_uuid = await _resolve_device_id(session, envelope)
+            authorization = await session.get(MeterAuthorization, device_uuid)
+            node = await session.get(CommunityNode, authorization.node_id) if authorization else None
+            if not authorization or not authorization.active or not node or not node.authorized:
+                raise ValueError("Device is not authorized by a community")
+            supplied = hashlib.sha256(str(raw.get("credential", "")).encode()).hexdigest()
+            if not hmac.compare_digest(supplied, authorization.credential_hash):
+                raise ValueError("Invalid device credential")
+            expected_topic = f"solar/{envelope.home_id}/{envelope.device_id}/telemetry"
+            if raw.get("_mqtt_topic", expected_topic) != expected_topic:
+                raise ValueError("MQTT topic does not match authorized meter")
+            if abs((datetime.now(UTC) - envelope.measured_at).total_seconds()) > 86400 or envelope.measured_at > datetime.now(UTC) + __import__('datetime').timedelta(seconds=30):
+                raise ValueError("Telemetry timestamp outside acceptance window")
         except ValueError as exc:
             logger.warning("Skipping message: %s", exc)
             continue
@@ -284,6 +318,8 @@ async def _resolve_device_id(session: AsyncSession, envelope: Envelope) -> uuid.
         )
     if str(device.home_id) != str(uuid.UUID(envelope.home_id)):
         raise ValueError("Telemetry home_id does not match the registered device home")
+    if device.status != "ACTIVE" or device.device_type != envelope.sensor_type:
+        raise ValueError("Device must be active and match the measurement channel")
     device.last_seen_at = datetime.now(UTC)
     return device.id
 

@@ -67,12 +67,7 @@ class EnergyService:
     async def approve_credit(
         self, actor, credit_id: UUID, session: AsyncSession
     ):
-        if actor.role not in ("admin", "operator"):
-            raise PermissionError("Only operators can approve energy credits")
-        credit = await self.repository.get_credit(session, credit_id)
-        if credit is None:
-            raise LookupError("Credit not found")
-        await self.repository.approve_credit(session, credit)
+        from src.modules.community.service import CommunityService
+        credit = await CommunityService().approve_credit(session, actor, credit_id)
         await session.commit()
-        await session.refresh(credit)
         return credit

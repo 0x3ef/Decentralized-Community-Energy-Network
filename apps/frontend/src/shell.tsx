@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import CommunityPage from './CommunityPage'
 import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -26,8 +27,8 @@ function AppLayout() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const links = [
-    ['Dashboard', '/', BarChart3], ['My Homes', '/homes', Home], ['Energy Monitoring', '/energy', Zap],
-    ['Energy Credits', '/credits', CreditCard], ['Marketplace', '/marketplace', ShoppingCart],
+    ['Dashboard', '/dashboard', BarChart3], ['My Homes', '/homes', Home], ['Energy Monitoring', '/energy', Zap],
+    ['Community Settlement', '/community', Blocks], ['Energy Credits', '/credits', CreditCard], ['Marketplace', '/marketplace', ShoppingCart],
     ['My Orders', '/orders', Activity], ['My Trades', '/trades', ArrowRight], ['Wallet', '/wallet', WalletCards],
     ['Redemptions', '/redemptions', RefreshCw], ['Blockchain', '/blockchain', Blocks], ['Settings', '/settings', Settings],
   ] as const
@@ -35,10 +36,10 @@ function AppLayout() {
   return <div className="shell">
     <aside className={`sidebar ${open ? 'sidebar-open' : ''}`}>
       <div className="brand"><span className="brand-mark"><Sun size={20} /></span><span>Solar<span>Market</span></span><button className="icon-btn mobile-only" onClick={() => setOpen(false)} aria-label="Close menu"><X size={20} /></button></div>
-      <nav>{links.map(([label, path, Icon]) => <NavLink key={path} to={path} end={path === '/'} onClick={() => setOpen(false)} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}><Icon size={18} /><span>{label}</span></NavLink>)}</nav>
+      <nav>{links.map(([label, path, Icon]) => <NavLink key={path} to={path} end={path === '/dashboard'} onClick={() => setOpen(false)} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}><Icon size={18} /><span>{label}</span></NavLink>)}</nav>
       <div className="sidebar-bottom"><div className="user-chip"><div className="avatar">{user?.full_name?.slice(0, 1).toUpperCase() ?? '?'}</div><div><strong>{user?.full_name ?? 'Account'}</strong><small>{user?.email ?? ''}</small></div></div><button className="nav-item logout" onClick={logout}><LogOut size={18} />Sign out</button></div>
     </aside>
-    <main className="main"><header className="topbar"><button className="icon-btn mobile-only" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={22} /></button><div className="topbar-spacer" /><span className="status-dot" />Local network connected</header><div className="page"><Outlet /></div></main>
+    <main className="main"><header className="topbar"><button className="icon-btn mobile-only" onClick={() => setOpen(true)} aria-label="Open menu"><Menu size={22} /></button><div className="topbar-spacer" /><span className="status-dot" />Local development prototype</header><div className="page"><Outlet /></div></main>
   </div>
 }
 
@@ -48,13 +49,13 @@ function Protected() { const { user, loading } = useAuth(); if (loading) return 
 
 function Login() {
   const navigate = useNavigate(); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState('')
-  const mutation = useMutation({ mutationFn: () => apiClient.login({ email, password }), onSuccess: (data) => { authTokens.set(data); navigate('/') }, onError: (e) => setError(errorMessage(e)) })
+  const mutation = useMutation({ mutationFn: () => apiClient.login({ email, password }), onSuccess: (data) => { authTokens.set(data); navigate('/community') }, onError: (e) => setError(errorMessage(e)) })
   return <AuthCard title="Welcome back" subtitle="Sign in to monitor, trade, and manage your solar assets."><form onSubmit={(e) => { e.preventDefault(); setError(''); mutation.mutate() }}><Field label="Email" type="email" value={email} onChange={setEmail} required /><Field label="Password" type="password" value={password} onChange={setPassword} required /><div className="form-row end"><a href="/forgot-password">Forgot password?</a></div>{error && <Notice tone="error">{error}</Notice>}<button className="primary full" disabled={mutation.isPending}>{mutation.isPending ? 'Signing in…' : 'Sign in'} <ArrowRight size={17} /></button></form><p className="auth-switch">New to SolarMarket? <a href="/register">Create an account</a></p></AuthCard>
 }
 
 function Register() {
   const navigate = useNavigate(); const [form, setForm] = useState({ full_name: '', email: '', password: '', confirm: '' }); const [error, setError] = useState('')
-  const mutation = useMutation({ mutationFn: () => apiClient.register({ full_name: form.full_name, email: form.email, password: form.password }), onSuccess: (data) => { authTokens.set(data); navigate('/') }, onError: (e) => setError(errorMessage(e)) })
+  const mutation = useMutation({ mutationFn: () => apiClient.register({ full_name: form.full_name, email: form.email, password: form.password }), onSuccess: (data) => { authTokens.set(data); navigate('/community') }, onError: (e) => setError(errorMessage(e)) })
   return <AuthCard title="Create your account" subtitle="Start turning clean energy into measurable value."><form onSubmit={(e) => { e.preventDefault(); if (form.password !== form.confirm) return setError('Passwords do not match.'); setError(''); mutation.mutate() }}><Field label="Full name" value={form.full_name} onChange={(v) => setForm({ ...form, full_name: v })} required /><Field label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required /><Field label="Password" type="password" value={form.password} onChange={(v) => setForm({ ...form, password: v })} required /><Field label="Confirm password" type="password" value={form.confirm} onChange={(v) => setForm({ ...form, confirm: v })} required />{error && <Notice tone="error">{error}</Notice>}<button className="primary full" disabled={mutation.isPending}>{mutation.isPending ? 'Creating…' : 'Create account'} <ArrowRight size={17} /></button></form><p className="auth-switch">Already registered? <a href="/login">Sign in</a></p></AuthCard>
 }
 
@@ -119,4 +120,4 @@ function SettingsPage() { const { user } = useAuth(); return <><PageHeader eyebr
 function DataTable({ headers, rows }: { headers: string[]; rows: ReactNode[][] }) { return <div className="table-wrap"><table><thead><tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>)}</tbody></table></div> }
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) { return <div className="modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.currentTarget === e.target) onClose() }}><div className="modal"><div className="panel-heading"><h2>{title}</h2><button className="icon-btn" onClick={onClose} aria-label="Close"><X size={18} /></button></div>{children}</div></div> }
 
-export default function App() { return <BrowserRouter><Routes><Route element={<AuthLayout />}><Route path="/login" element={<Login />} /><Route path="/register" element={<Register />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /></Route><Route element={<Protected />}><Route element={<AppLayout />}><Route index element={<Dashboard />} /><Route path="/homes" element={<Homes />} /><Route path="/energy" element={<Energy />} /><Route path="/credits" element={<Credits />} /><Route path="/marketplace" element={<Marketplace />} /><Route path="/orders" element={<Orders />} /><Route path="/trades" element={<Orders trades />} /><Route path="/wallet" element={<Wallet />} /><Route path="/redemptions" element={<Redemptions />} /><Route path="/blockchain" element={<Blockchain />} /><Route path="/settings" element={<SettingsPage />} /></Route></Route><Route path="*" element={<Navigate to="/" replace />} /></Routes></BrowserRouter> }
+export default function App() { return <BrowserRouter><Routes><Route element={<AuthLayout />}><Route path="/login" element={<Login />} /><Route path="/register" element={<Register />} /><Route path="/forgot-password" element={<ForgotPassword />} /><Route path="/reset-password" element={<ResetPassword />} /></Route><Route element={<Protected />}><Route element={<AppLayout />}><Route index element={<Navigate to="/community" replace />} /><Route path="/dashboard" element={<Dashboard />} /><Route path="/community" element={<CommunityPage />} /><Route path="/homes" element={<Homes />} /><Route path="/energy" element={<Energy />} /><Route path="/credits" element={<Credits />} /><Route path="/marketplace" element={<Marketplace />} /><Route path="/orders" element={<Orders />} /><Route path="/trades" element={<Orders trades />} /><Route path="/wallet" element={<Wallet />} /><Route path="/redemptions" element={<Redemptions />} /><Route path="/blockchain" element={<Blockchain />} /><Route path="/settings" element={<SettingsPage />} /></Route></Route><Route path="*" element={<Navigate to="/" replace />} /></Routes></BrowserRouter> }

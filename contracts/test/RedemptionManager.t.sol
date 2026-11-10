@@ -12,11 +12,13 @@ contract RedemptionManagerTest is Test {
     address internal user = address(0xA11CE);
     uint256 internal constant WEI_PER_TOKEN = 0.001 ether; // 1000 SUN = 1 ETH
 
+    receive() external payable {}
+
     function setUp() public {
-        token = new SUNToken();
+        token = new SUNToken(address(this), address(this));
         manager = new RedemptionManager(address(token), WEI_PER_TOKEN);
 
-        token.mint(user, 1000e18);
+        token.mint(user, 1000e18, keccak256("redemption-test"));
         vm.prank(user);
         token.approve(address(manager), type(uint256).max);
 

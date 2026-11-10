@@ -180,9 +180,7 @@ api.interceptors.response.use(undefined, async (error) => {
   }
   original._retry = true
   refreshPromise ??= axios
-    .post<TokenResponse>(`${api.defaults.baseURL}/auth/refresh`, {
-      refresh_token: refreshToken,
-    })
+    .get<TokenResponse>(`${api.defaults.baseURL}/auth/refresh_token`, {headers: {Authorization: `Bearer ${refreshToken}`}})
     .then(({ data }) => {
       authTokens.set(data)
       return data.access_token
@@ -203,36 +201,39 @@ api.interceptors.response.use(undefined, async (error) => {
 export const apiClient = {
   login: (body: { email: string; password: string }) =>
     api.post<TokenResponse>('/auth/login', body).then((r) => r.data),
-  register: (body: { email: string; full_name: string; password: string }) =>
-    api.post<TokenResponse>('/auth/register', body).then((r) => r.data),
+  register: async (body: { email: string; full_name: string; password: string }) => {
+    const [first_name, ...last] = body.full_name.trim().split(/\s+/)
+    await api.post('/auth/signup', {email:body.email,password:body.password,first_name,last_name:last.join(' ') || first_name,username:crypto.randomUUID().slice(0,8)})
+    return (await api.post<TokenResponse>('/auth/login',{email:body.email,password:body.password})).data
+  },
   forgotPassword: (email: string) => api.post('/auth/password/forgot', { email }).then((r) => r.data),
   resetPassword: (token: string, password: string) =>
     api.post('/auth/password/reset', { token, password }).then((r) => r.data),
-  me: () => api.get<User>('/auth/me').then((r) => r.data),
-  logout: () => api.post('/auth/logout', { refresh_token: refreshToken }),
+  me: () => api.get('/auth/me').then(({data}) => ({...data,id:data.uid,full_name:`${data.first_name} ${data.last_name}`} as User)),
+  logout: () => api.get('/auth/logout'),
   portfolio: () => api.get<Record<string, unknown>>('/users/me/portfolio').then((r) => r.data),
-  homes: () => api.get<Home[]>('/users/me/homes').then((r) => r.data),
-  home: (id: string) => api.get<Home>(`/homes/${id}`).then((r) => r.data),
+  homes: () => api.get('/home/').then(({data}) => (data.homes as Home[]).map((home) => ({...home,name:home.name || home.address || home.id}))),
+  home: (id: string) => api.get(`/home/${id}`).then(({data}) => ({...data.home,name:data.home.name || data.home.address} as Home)),
   createHome: (body: Omit<Home, 'id' | 'owner_id' | 'status' | 'created_at'>) =>
-    api.post<Home>('/homes', body).then((r) => r.data),
+    api.post('/home/', body).then(({data}) => ({...data.home,name:data.home.name || data.home.address} as Home)),
   devices: (homeId: string) => api.get<Device[]>(`/homes/${homeId}/devices`).then((r) => r.data),
-  credits: () => api.get<Credit[]>('/users/me/credits').then((r) => r.data),
-  credit: (id: string) => api.get<Credit>(`/credits/${id}`).then((r) => r.data),
+  credits: () => api.get<Credit[]>('/energy/credits').then((r) => r.data),
+  credit: (id: string) => api.get<Credit>(`/energy/credits/${id}`).then((r) => r.data),
   issuance: (id: string) => api.get<Issuance>(`/credits/${id}/issuance`).then((r) => r.data),
   intervals: (homeId: string) =>
-    api.get<EnergyInterval[]>(`/homes/${homeId}/energy/intervals`).then((r) => r.data),
+    api.get<EnergyInterval[]>(`/energy/homes/${homeId}/energy/intervals?start=${new Date(Date.now()-86400000).toISOString()}&end=${new Date().toISOString()}`).then((r) => r.data),
   summary: (homeId: string) =>
-    api.get<EnergySummary>(`/homes/${homeId}/energy/summary`).then((r) => r.data),
+    api.get<EnergySummary>(`/energy/homes/${homeId}/energy/summary?start=${new Date(Date.now()-86400000).toISOString()}&end=${new Date().toISOString()}`).then((r) => r.data),
   orders: () => api.get<Order[]>('/marketplace/orders').then((r) => r.data),
-  myOrders: () => api.get<Order[]>('/users/me/orders').then((r) => r.data),
-  trades: () => api.get<Trade[]>('/users/me/trades').then((r) => r.data),
+  myOrders: () => api.get<Order[]>('/marketplace/orders/me').then((r) => r.data),
+  trades: () => api.get<Trade[]>('/marketplace/trades/me').then((r) => r.data),
   stats: () => api.get<Record<string, number>>('/marketplace/stats').then((r) => r.data),
   createOrder: (body: { order_type: string; token_amount: string; price_per_token: string }) =>
     api.post<Order>('/marketplace/orders', body).then((r) => r.data),
   fill: (token_amount: string) =>
     api.post<Trade[]>('/marketplace/fill', { token_amount }).then((r) => r.data),
   cancelOrder: (id: string) => api.post<Order>(`/marketplace/orders/${id}/cancel`).then((r) => r.data),
-  wallets: () => api.get<Wallet[]>('/users/me/wallets').then((r) => r.data),
+  wallets: () => api.get('/wallet/').then(({data}) => data.wallets as Wallet[]),
   addWallet: (body: { address: string; chain_id: number }) =>
     api.post<Wallet>('/users/me/wallets', body).then((r) => r.data),
   redemptions: (userId: string) =>

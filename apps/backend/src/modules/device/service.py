@@ -1,72 +1,37 @@
-from datetime import datetime
-
-from sqlmodel import desc, select
-from sqlmodel.ext.asyncio.session import AsyncSession
-
+"""Canonical Device persistence with home ownership checks."""
+from uuid import UUID
+from sqlmodel import select
 from .models import Device
-
-from .schemas import DeviceCreateModel, DeviceModel, DeviceUpdateModel, DeviceCredentialIssue
-
-
-
+from src.modules.home.service import HomeService
 
 class DeviceService:
-    async def create_device(self, user, device_data: DeviceCreateModel, session: AsyncSession) -> DeviceModel:
-        device_data_dict = device_data.model_dump()
-        device_data_dict["owner_id"] = user.id
-
-        new_device = DeviceModel(**device_data_dict)
-
-        session.add(new_device)
-
-        await session.commit()
-
-        return new_device 
-
-    async def get_devices_by_home(self, user, home_id: str, session: AsyncSession) -> list[DeviceModel]:
-        statement = (
-            select(DeviceModel)
-            .where(DeviceModel.home_id == home_id)
-            .order_by(desc(DeviceModel.created_at))
-        )
-
-        result = await session.exec(statement)
-
-        return result.all()
-
-    async def get_device_by_id(self, device_id: str, session: AsyncSession) -> DeviceModel | None:
-        statement = select(DeviceModel).where(
-            DeviceModel.id == device_id
-        )
-
-        result = await session.exec(statement)
-
-        device = result.first()
-
-        return device if device is not None else None
-
-    async def update_device(self, user, device_id: str, device_data: DeviceUpdateModel, session: AsyncSession) -> DeviceModel | None:
-        device = await self.get_device_by_id(user, device_id, session)
-
-        if device is None:
-            return None
-
-        device_data_dict = device_data.model_dump(exclude_unset=True)
-
-        for field, value in device_data_dict.items():
-            setattr(device, field, value)
-
-        await session.commit()
-
-        return device
-
-    async def delete_device(self, user, device_id: str, session: AsyncSession) -> bool:
-        device = await self.get_device_by_id(user, device_id, session)
-
-        if device is None:
-            return False
-
-        await session.delete(device)
-        await session.commit()
-
+    async def create_device(self,user,device_data,session):
+        if not await HomeService().get_home_by_id(user,device_data.home_id,session):
+            raise PermissionError('Home belongs to another user')
+        data=device_data.model_dump()
+        data['device_type']={'SMART_METER':'smart_meter','INVERTER':'solar_inverter','BATTERY':'battery_monitor'}.get(data['device_type'],data['device_type'])
+        row=Device(**data); session.add(row); await session.commit()
+        return row
+    async def get_devices_by_home(self,user,home_id,session):
+        if not await HomeService().get_home_by_id(user,home_id,session):
+            raise PermissionError('Home belongs to another user')
+        return (await session.exec(select(Device).where(Device.home_id==UUID(str(home_id))))).all()
+    async def get_device_by_id(self,user,device_id,session):
+        row=await session.get(Device,UUID(str(device_id)))
+        if row and not await HomeService().get_home_by_id(user,row.home_id,session):
+            raise PermissionError('Meter belongs to another user')
+        return row
+    async def update_device(self,user,device_id,device_data,session):
+        row=await self.get_device_by_id(user,device_id,session)
+        if row:
+            for key,value in device_data.model_dump(exclude_unset=True).items():
+                if key=='status' and value not in ('PENDING','DISABLED'):
+                    raise PermissionError('Only community operators may activate meters')
+                setattr(row,key,value)
+            await session.commit()
+        return row
+    async def delete_device(self,user,device_id,session):
+        row=await self.get_device_by_id(user,device_id,session)
+        if not row: return False
+        row.status='DISABLED'; await session.commit()
         return True

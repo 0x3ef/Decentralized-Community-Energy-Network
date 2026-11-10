@@ -25,20 +25,7 @@ class MarketplaceService:
     async def create_order(
         self, user, payload: OrderCreate, session: AsyncSession
     ):
-        order = Order(
-            creator_id=user.uid,
-            order_type=payload.order_type,
-            token_amount=payload.token_amount,
-            price_per_token=payload.price_per_token,
-            remaining_amount=payload.token_amount,
-            status="OPEN",
-        )
-        session.add(order)
-        await session.flush()
-        trades = await self.matcher.match(session, order)
-        await session.commit()
-        await session.refresh(order)
-        return {"order": order, "trades": trades}
+        raise ValueError("Use the community SUN/USDx escrow contract with a user-signed SELL order; the legacy unreserved matching book is read-only")
 
     async def cancel_order(
         self, user, order_id: UUID, session: AsyncSession

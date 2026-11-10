@@ -17,7 +17,7 @@ class DeviceCreateModel(BaseModel):
 class DeviceModel(BaseModel):
     id: UUID
     home_id: UUID
-    device_code: str
+    device_id: UUID
     device_type: str
     manufacturer: str | None
     model: str | None
@@ -27,11 +27,6 @@ class DeviceModel(BaseModel):
     created_at: datetime
 
 class DeviceUpdateModel(BaseModel):
-    name: str | None = None
-    address: str | None = None
-    city: str | None = None
-    installed_capacity_w: int | None = Field(default=None, ge=0)
-    has_battery: bool | None = None
     status: str | None = None
 
 class DeviceCredentialIssue(BaseModel):
@@ -39,7 +34,7 @@ class DeviceCredentialIssue(BaseModel):
     expires_at: datetime | None
 
 class TelemetryIngest(BaseModel):
-    device_code: str
+    device_id: UUID
     sequence_number: int = Field(ge=0)
     schema_version: str = "1"
     measured_at: datetime
