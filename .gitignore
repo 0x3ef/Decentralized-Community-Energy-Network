@@ -48,3 +48,6 @@ Thumbs.db
 # Local development tooling and credentials
 .venv/
 .dev-tools/
+
+apps/frontend/test-results/
+apps/frontend/playwright-report/
