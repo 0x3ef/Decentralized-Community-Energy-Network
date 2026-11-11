@@ -1,6 +1,12 @@
 # Optional loopback-only password+ACL broker; use TLS for untrusted networks.
 services:
   mosquitto:
+    # Subscriber heartbeat verifies actual authenticated MQTT connectivity.
+    healthcheck:
+      test: [CMD-SHELL, "pidof mosquitto >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
     volumes:
       - ./mosquitto/secure/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ${MQTT_PASSWORD_FILE:?Set a provisioned Mosquitto password file}:/run/mqtt/passwords:ro

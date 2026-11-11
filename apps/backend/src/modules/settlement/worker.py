@@ -12,7 +12,7 @@ from src.modules.community.models import (
 )
 from src.modules.energy.models import EnergyInterval
 from src.modules.settlement.chain import NativeSettlementChain
-from src.modules.settlement.models import SettlementBatch
+from src.modules.settlement.models import SettlementBatch, NativeWalletTransaction
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 class NativeSettlementWorker:
     def __init__(self, chain=None):
         self.chain = chain or NativeSettlementChain()
+        self._unavailable = set()
 
     async def run_once(self, factory):
         async with factory() as session:
@@ -29,6 +30,49 @@ class NativeSettlementWorker:
         for community_id in communities:
             try:
                 async with factory() as session:
+                    deployment = await session.get(NativeDeployment, community_id)
+                    community = await session.get(EnergyCommunity, community_id)
+                    addresses = (
+                        community.registry_address,
+                        deployment.sun_address,
+                        deployment.settlement_address,
+                        deployment.vault_address,
+                    )
+                    if not all(
+                        address and self.chain.web3.eth.get_code(address)
+                        for address in addresses
+                    ):
+                        # A reset/wrong chain must not leave historical confirmations
+                        # presented as currently canonical or trigger fresh payments.
+                        await self.chain.service.repository.lock(
+                            session, f"native-reconcile:{community_id}"
+                        )
+                        for batch in (
+                            await session.exec(
+                                select(SettlementBatch).where(
+                                    SettlementBatch.community_id == community_id
+                                )
+                            )
+                        ).all():
+                            batch.status = "RECONCILIATION_REQUIRED"
+                        for transaction in (
+                            await session.exec(
+                                select(NativeWalletTransaction).where(
+                                    NativeWalletTransaction.community_id
+                                    == community_id,
+                                    NativeWalletTransaction.status == "CONFIRMED",
+                                )
+                            )
+                        ).all():
+                            transaction.status = "RECONCILIATION_REQUIRED"
+                        await session.commit()
+                        if community_id not in self._unavailable:
+                            logger.warning(
+                                "native_deployment_unavailable: %s", community_id
+                            )
+                            self._unavailable.add(community_id)
+                        continue
+                    self._unavailable.discard(community_id)
                     await self.chain.service.repository.lock(
                         session, f"native-reconcile:{community_id}"
                     )

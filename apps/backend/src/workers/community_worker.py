@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import signal
+from src.core.observability import heartbeat, configure_logging
 from src.core.db import AsyncSessionFactory, dispose_engine
 from src.modules.community.chain import CommunityChain
 from src.modules.energy.processor import EnergyProcessor
@@ -27,10 +28,13 @@ async def run():
                     await processor.finalize_closed_intervals(session)
                 if Config.NATIVE_SETTLEMENT_ENABLED:
                     await native.run_once(AsyncSessionFactory)
-                await chain.audit_confirmed(AsyncSessionFactory)
-                await chain.process_outbox(AsyncSessionFactory)
-                await chain.sync_events(AsyncSessionFactory)
-            except Exception:
+                if Config.LEGACY_SETTLEMENT_ENABLED:
+                    await chain.audit_confirmed(AsyncSessionFactory)
+                    await chain.process_outbox(AsyncSessionFactory)
+                    await chain.sync_events(AsyncSessionFactory)
+                await heartbeat("worker")
+            except Exception as exc:
+                await heartbeat("worker",False,error_code=type(exc).__name__)
                 logger.exception("Community worker iteration failed")
             try:
                 await asyncio.wait_for(stop.wait(), timeout=2)
@@ -41,5 +45,5 @@ async def run():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    configure_logging()
     asyncio.run(run())

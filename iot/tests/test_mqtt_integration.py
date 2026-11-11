@@ -39,7 +39,7 @@ def _wait_for_message(
     raise AssertionError(f"No message on {topic_prefix} within {timeout}s")
 
 
-def test_gateway_republishes_to_mqtt(mqtt_host: str, gateway_address: str) -> None:
+def test_gateway_republishes_to_mqtt(mqtt_host: str, mqtt_port: int, gateway_address: str) -> None:
     """Send a smart-meter reading through gRPC and expect it on MQTT."""
     inbox: queue.Queue[tuple[str, dict]] = queue.Queue()
 
@@ -52,7 +52,7 @@ def test_gateway_republishes_to_mqtt(mqtt_host: str, gateway_address: str) -> No
         inbox.put((msg.topic, json.loads(msg.payload)))
 
     client.on_message = _on_message
-    client.connect(mqtt_host, 1883, keepalive=30)
+    client.connect(mqtt_host, mqtt_port, keepalive=30)
     client.subscribe("solar/#", qos=1)
     client.loop_start()
 

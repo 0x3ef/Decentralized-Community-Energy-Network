@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     COMMUNITY_REGISTRY_ADDRESS: str = ""
     GOVERNANCE_TIMELOCK_ADDRESS: str = ""
     NATIVE_SETTLEMENT_ENABLED: bool = True
+    LEGACY_SETTLEMENT_ENABLED: bool = False
     NATIVE_SETTLEMENT_START_BLOCK: int = Field(default=0, ge=0)
     NATIVE_SETTLEMENT_LOOKBACK_HOURS: int = Field(default=24, ge=1, le=168)
     NATIVE_SETTLEMENT_INTERVAL_LIMIT: int = Field(default=200, ge=1, le=2000)
@@ -52,7 +53,7 @@ class Settings(BaseSettings):
     BATCH_FLUSH_SECONDS: float = 1
     LOG_LEVEL: str = "INFO"
     CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:8080", "http://127.0.0.1:8080"]
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
 
     @model_validator(mode="after")
     def secure_configuration(self):

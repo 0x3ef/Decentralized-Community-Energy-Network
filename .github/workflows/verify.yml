@@ -1,0 +1,40 @@
+name: Verify native energy protocol
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned development dependencies
+        run: ./scripts/install_dev.sh
+      - name: Contract, backend, MQTT, IoT and frontend checks
+        run: |
+          source .venv/bin/activate
+          make test
+          python scripts/sync_abis.py
+      - name: Build and start integrated Docker services
+        run: |
+          source .venv/bin/activate
+          make setup
+          make demo
+          curl -fsS http://127.0.0.1:8000/ready
+          curl -fsS http://127.0.0.1:8080/api/v1/openapi.json >/dev/null
+          make demo-scenario
+          docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/compose.prototype.yml restart worker
+          make demo-scenario
+      - name: Browser journeys against real API and Anvil
+        run: |
+          cd apps/frontend
+          npx playwright install --with-deps chromium
+          npm run dev -- --host 127.0.0.1 > /tmp/solar-vite.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:5173/ >/dev/null && break; sleep 1; done
+          npm run test:e2e:all

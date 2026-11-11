@@ -8,14 +8,17 @@ RUN --mount=type=secret,id=proxy_ca \
     pip install --no-cache-dir -r requirements.lock
 COPY apps/backend/ ./
 COPY scripts/entry_point.sh /entry_point.sh
-RUN chmod +x /entry_point.sh
+RUN chmod -R a+rX /app && chmod 0755 /entry_point.sh
 ENTRYPOINT ["/entry_point.sh"]
 FROM base AS api
+USER 1000:1000
 EXPOSE 8000
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
 FROM base AS subscriber
+USER 1000:1000
 CMD ["python", "-m", "src.iot.mqtt_handler"]
 FROM base AS worker
+USER 1000:1000
 CMD ["python", "-m", "src.workers.community_worker"]
 FROM base AS tests
 RUN --mount=type=secret,id=proxy_ca \

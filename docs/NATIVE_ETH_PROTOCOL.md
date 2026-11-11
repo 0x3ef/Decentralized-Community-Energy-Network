@@ -91,7 +91,7 @@ Compile and test before deployment:
 ```sh
 forge test --root contracts
 # Set COMMUNITY_ID to a nonzero bytes32 community identifier.
-# Provide BACKEND_PRIVATE_KEY via the environment/secret store, never source code.
+# Provide DEPLOYER_PRIVATE_KEY and explicit GOVERNANCE_PROPOSER_ADDRESS / GOVERNANCE_EXECUTOR_ADDRESS via the environment, never source code.
 forge script contracts/script/DeployGoverned.s.sol:DeployGoverned \
   --root contracts --rpc-url "$WEB3_PROVIDER_URL" --broadcast
 ```

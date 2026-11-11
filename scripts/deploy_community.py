@@ -19,6 +19,8 @@ args = parser.parse_args()
 web3 = Web3(Web3.HTTPProvider(Config.WEB3_PROVIDER_URL))
 if Config.ENVIRONMENT != "development" or web3.eth.chain_id not in (31337, 1337):
     raise SystemExit("This deployment tool is restricted to local development chains")
+if not Config.LEGACY_SETTLEMENT_ENABLED:
+    raise SystemExit("Legacy deployment is disabled. Use scripts/deploy.sh COMMUNITY_UUID --network sepolia for the native protocol.")
 account = web3.eth.account.from_key(Config.BACKEND_PRIVATE_KEY)
 web3.provider.make_request("anvil_setBalance", [account.address, hex(10**20)])
 root = Path(__file__).resolve().parents[1]

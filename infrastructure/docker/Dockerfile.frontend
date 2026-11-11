@@ -10,10 +10,15 @@ RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
     npm ci --strict-ssl=true
 
-COPY apps/frontend/ ./
-
-ARG VITE_API_BASE_URL=http://localhost:8000
-ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+COPY apps/frontend/src ./src
+COPY apps/frontend/public ./public
+COPY apps/frontend/index.html apps/frontend/tsconfig*.json apps/frontend/vite.config.ts ./
+ARG VITE_API_URL=/api/v1
+ARG VITE_CHAIN_ID=31337
+ARG VITE_REGISTRY_ADDRESS=
+ARG VITE_TIMELOCK_ADDRESS=
+ARG VITE_SEPOLIA_RPC_URL=
+ENV VITE_API_URL=${VITE_API_URL} VITE_CHAIN_ID=${VITE_CHAIN_ID} VITE_REGISTRY_ADDRESS=${VITE_REGISTRY_ADDRESS} VITE_TIMELOCK_ADDRESS=${VITE_TIMELOCK_ADDRESS} VITE_SEPOLIA_RPC_URL=${VITE_SEPOLIA_RPC_URL}
 
 RUN npm run build
 

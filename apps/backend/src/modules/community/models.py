@@ -170,10 +170,19 @@ class ChainOperation(SQLModel, table=True):
     """Signed transaction persisted before broadcasting; retries use identical bytes."""
 
     __tablename__ = "community_chain_operations"
-    __table_args__ = (UniqueConstraint("chain_id", "sender", "nonce"),)
+    __table_args__ = (
+        UniqueConstraint(
+            "chain_id",
+            "chain_genesis",
+            "sender",
+            "nonce",
+            name="uq_chain_operation_network_nonce",
+        ),
+    )
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     outbox_id: UUID = Field(foreign_key="outbox_events.id", unique=True)
     chain_id: int
+    chain_genesis: str = Field(default="", max_length=66)
     sender: str = Field(max_length=42)
     nonce: int
     transaction_hash: str = Field(max_length=66, unique=True)

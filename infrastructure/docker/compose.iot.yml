@@ -17,11 +17,13 @@ services:
       MQTT_TLS: ${SIMULATOR_MQTT_TLS:-false}
       MQTT_CA_CERT: /run/simulation/ca.crt
       DEVICE_REGISTRY: /run/simulation/registry.json
+      HOME_CATALOGUE_FILE: /run/simulation/home-catalogue.json
       CHECKPOINT_PATH: /state/simulator.json
       # The registry references env binding names, never embedded credentials.
     env_file: ${SIMULATOR_ENV_FILE:?Set the path to a private simulator environment file}
     volumes:
       - ${SIMULATOR_REGISTRY_FILE:?Set the path to the provisioned registry}:/run/simulation/registry.json:ro
+      - ${SIMULATOR_CATALOGUE_FILE:?Set the path to the approved home catalogue}:/run/simulation/home-catalogue.json:ro
       - simulation_state:/state
       - ${SIMULATOR_CA_FILE:-/etc/ssl/certs/ca-certificates.crt}:/run/simulation/ca.crt:ro
     depends_on: [mosquitto, subscriber]

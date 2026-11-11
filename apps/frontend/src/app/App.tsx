@@ -1,3 +1,4 @@
+import { SystemStatus } from "../features/settings/SystemStatus";
 import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import {
   BrowserRouter,
@@ -78,6 +79,7 @@ function SettingsPage() {
       title="Configuración"
       description="Tu cuenta, preferencias y capacidades del despliegue."
     >
+      <SystemStatus />
       <Card title="Perfil de cuenta">
         <dl className="detail-list">
           <dt>Nombre</dt>

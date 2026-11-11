@@ -1,0 +1,136 @@
+# Prompt 5 integration report
+
+## Delivered behavior
+
+The canonical path uses native test ETH and SUN. Docker starts reviewed Alembic
+migrations before application services. A deterministic, local-only commissioner
+creates SQLModel identities and uses real timelock transactions to authorize the
+community, policy, participants, nodes and meters. It deploys the five canonical
+contracts, isolates the oracle from governance and participants, and revokes the
+bootstrap SUN minter. Existing identities and accounting are checked and preserved.
+
+The finite demonstrator exercises authenticated MQTT ingestion, quality checks,
+deduplication, interval accounting, automatic allocation, the actual background
+worker, confirmed EVM transactions, SUN delivery and retirement, and producer
+withdrawal. Continuous REALTIME simulation uses independent meter identities so
+it cannot reset the finite fixture's counters.
+
+The API and Spanish frontend expose service readiness and operator reconciliation
+status. Native chain operations record the genesis hash as well as chain ID, sender
+and nonce. Pending operations from another or unknown chain origin are blocked;
+missing deployed code quarantines affected records for reconciliation. A local
+chain reset never silently reuses old confirmed financial projections.
+
+## Executed local evidence
+
+[Machine-readable scenario](evidence/local-native-scenario.json) records the actual
+MQTT/API/worker/Anvil execution, including the local community, batch, statements
+and participant transaction hashes. These are local Anvil receipts, not Sepolia
+transactions or explorer-verifiable public deployments.
+
+| Verified quantity | Confirmed result |
+| --- | --- |
+| Eligible net injection / demand | 5 kWh / 3 kWh |
+| Allocation / unallocated injection | 3 kWh / 2 kWh |
+| Price | 0.001 Anvil ETH/kWh |
+| Consumer deposit / settlement | 0.01 ETH / 0.003 ETH |
+| Consumer available / reserved funds | 0.007 ETH / 0 ETH |
+| Producer entitlement / earnings withdrawn | 0.003 ETH / 0.003 ETH |
+| SUN issued / delivered / retired | 5 / 3 / 3 SUN |
+| Remaining SUN supply | 2 SUN |
+| Vault liabilities after withdrawal | 0.007 ETH |
+
+The scenario rejected an invalid device credential and replayed valid boundary
+packets. Restarting the worker and rerunning the journaled scenario succeeded
+without another deposit, settlement, retirement or earnings withdrawal. Bootstrap
+was also rerun against the existing deployment and preserved its identities.
+
+An isolated Docker Anvil restart probe using the configured persistent state and
+historical-state flags preserved the genesis hash, account nonce and transaction
+receipt history. This is a node persistence check; it does not establish recovery
+from every infrastructure failure or an arbitrary public-chain reorganization.
+
+## Verification executed in this environment
+
+| Check | Result |
+| --- | --- |
+| Foundry contract suite | 38 passed |
+| Backend integration suite, fresh PostgreSQL migrations and real test services | 48 passed |
+| IoT suite, isolated MQTT broker and gateway | 86 passed; 84.62% coverage |
+| Frontend unit/component/hook/wallet suite | 35 passed |
+| Frontend strict TypeScript, lint and production build | Passed |
+| Canonical contract ABI synchronization check | Passed |
+| Full browser journeys against real local API and EVM | 11 passed |
+| Complete local financial scenario and worker-restart replay | Passed |
+| Sepolia preflight without credentials | Correctly stopped before RPC/broadcast, exit 2 |
+
+The browser suite uses an explicit local EIP-1193 wallet transport for transaction
+journeys. The production Docker frontend additionally verifies the real producer
+and consumer balances from the MQTT scenario and the service-status screen.
+This does not claim that an installed MetaMask extension or a public Sepolia flow
+was exercised. GitHub Actions is configured to repeat verification; its remote
+execution is separate from these locally executed checks.
+
+The contract suite covers unauthorized activation and oracle submission, cross-community
+batches, suspended operations and preserved exits, unauthorized meters, insufficient
+and partial funding, invalid proofs, repeated issuance/retirement, reserved SUN,
+failed withdrawals, reentrancy and fuzzed liability backing. Backend integration
+covers receipt/index confirmation, replay/crash recovery, transaction replacement
+and a testable Anvil reorganization. The new governed MQTT test additionally checks
+actual provisioning, rejected credentials, deduplication, double withdrawal,
+retirement replay, and quarantine of an unanchored signed transaction.
+
+Integration testing found and corrected standalone SQLModel relationship
+registration, stale nonce handling after a local chain reset, internal proxy
+routing, nginx API/static-route precedence, and Docker DNS refresh after API
+recreation. A failed local browser artifact exposed a generated demo password;
+the credential and all affected encrypted demo keystores were rotated and the
+artifact removed. Production balance tests now authenticate through HTTP so that
+password does not enter a browser DOM snapshot. No current runtime secrets belong
+in the tracked evidence.
+
+## Sepolia status and remaining verification
+
+**No public deployment was executed.** This environment has no configured Sepolia
+RPC, funded deployment signer or public governance authority configuration.
+Preflight stopped before any broadcast. No public contract addresses, transaction
+hashes, faucet funding, source verification or public end-to-end success is claimed.
+
+[Sepolia deployment instructions](SEPOLIA_DEPLOYMENT.md) cover secure configuration,
+funding checks, authority separation, resumable receipt-confirmed deployment,
+three confirmations, the minimum one-day timelock/challenge periods, governance
+commissioning and wallet verification. Public deployment still requires these
+external inputs and a deliberate broadcast, followed by governance review and
+end-to-end verification on that network. Never paste private keys into chat or put
+an authenticated RPC URL into frontend configuration.
+
+The anonymous broker and zero-delay governance are loopback-only development
+conveniences. Real devices require authenticated broker ACLs/TLS, protected device
+provisioning and trustworthy metrology. Oracle trust, timestamp/measurement
+integrity and governance authority remain explicit assumptions. No physical energy
+routing, utility-bill adjustment, legal authorization, security audit, or
+production readiness is implied.
+
+Native ETH P2P trading, public community discovery, profile editing, complete
+participant-visible evidence and full SUN event histories remain outside the
+current API. Legacy payment-token workers are disabled by default; old artifacts
+are retained for compatibility. Reconciliation quarantines stale historical local
+communities rather than deleting their users or inventing replacement receipts.
+
+## Reproduce
+
+Follow the exact prerequisites and startup in [README](../README.md), then run:
+
+```bash
+make demo-scenario
+make simulate                  # optional continuous REALTIME homes 3–5
+make test
+python scripts/sync_abis.py
+# Start Vite separately, then:
+cd apps/frontend
+npm run test:e2e:all
+```
+
+The private runtime journal, encrypted wallets and credentials live in ignored
+`.run/demo` and environment files. The committed evidence contains public local
+transaction metadata only. The cloud environment was not published by this work.
