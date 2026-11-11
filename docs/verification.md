@@ -1,6 +1,11 @@
-# Prompt 5 integration report
+# Verification record
 
-## Delivered behavior
+## Scope and evidence date
+
+The following results were executed in the prior integration work at commit
+`e061ab0`, before this documentation-only audit. Test counts are historical evidence,
+not a claim that the full application suite was rerun for documentation changes.
+Current documentation checks are recorded in [documentation audit](documentation-audit.md).
 
 The canonical path uses native test ETH and SUN. Docker starts reviewed Alembic
 migrations before application services. A deterministic, local-only commissioner
@@ -96,7 +101,7 @@ RPC, funded deployment signer or public governance authority configuration.
 Preflight stopped before any broadcast. No public contract addresses, transaction
 hashes, faucet funding, source verification or public end-to-end success is claimed.
 
-[Sepolia deployment instructions](SEPOLIA_DEPLOYMENT.md) cover secure configuration,
+[Sepolia deployment instructions](deployment.md#sepolia-deployment-and-commissioning) cover secure configuration,
 funding checks, authority separation, resumable receipt-confirmed deployment,
 three confirmations, the minimum one-day timelock/challenge periods, governance
 commissioning and wallet verification. Public deployment still requires these
@@ -117,20 +122,31 @@ current API. Legacy payment-token workers are disabled by default; old artifacts
 are retained for compatibility. Reconciliation quarantines stale historical local
 communities rather than deleting their users or inventing replacement receipts.
 
+## Earlier verification context retained
+
+Earlier reports described distinct implementation stages, not simultaneous current
+results: initial USDx-era verification (20 contract / 9 backend / 44 IoT tests),
+governed native setup (38 / 18 / 66), automated settlement (28 backend), and IoT v2
+(43 backend / 86 IoT). Their smaller counts and historical payment units must not be
+used as the current native protocol's acceptance result. Git retains those reports.
+
+Useful unique evidence from those stages: the SQLModel seed ran twice on a fresh
+database with five homes, fifteen devices and zero falsely verified wallets; an
+existing-schema sentinel user survived upgrades; a disposable TLS Mosquitto test
+verified scoped delivery, cross-community ACL refusal and anonymous rejection.
+Simulator tests cover daily/night solar, SOC/conservation, restart determinism and
+faults. Earlier physics-only timing was a microbenchmark, not a broker/database
+throughput guarantee. No public meter, mutual-TLS acceptance deployment or public
+network settlement is established by these checks.
+
+Frontend route/responsive checks and the retained screenshots used local fixtures;
+no formal WCAG audit or live MetaMask extension flow was run.
+
 ## Reproduce
 
-Follow the exact prerequisites and startup in [README](../README.md), then run:
-
-```bash
-make demo-scenario
-make simulate                  # optional continuous REALTIME homes 3–5
-make test
-python scripts/sync_abis.py
-# Start Vite separately, then:
-cd apps/frontend
-npm run test:e2e:all
-```
-
-The private runtime journal, encrypted wallets and credentials live in ignored
-`.run/demo` and environment files. The committed evidence contains public local
-transaction metadata only. The cloud environment was not published by this work.
+[Getting started](getting-started.md) owns startup and finite demonstration commands.
+[Development](development.md) owns test commands, fixtures and prerequisites.
+Current private scenario results and encrypted wallets live under ignored
+`.run/demo`; the committed evidence contains public local transaction metadata only.
+Neither this documentation audit nor the prior integration published the cloud
+environment.
