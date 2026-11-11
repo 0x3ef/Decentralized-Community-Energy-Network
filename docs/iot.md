@@ -245,3 +245,24 @@ The default simulator cycle is 15 seconds; this is separate from the default
 transport security settings are defined in [configuration](configuration.md).
 Use `make simulate` after `make demo` for the registered continuous fixture; see
 [getting started](getting-started.md#start-continuous-simulation).
+
+## Disconnected publisher recovery
+
+`MQTT publish was not accepted (rc=4)` is Paho's disconnected-client error, not
+a confirmed delivery or an instruction to change measurement credentials. Check
+Mosquitto connection logs for broker availability, rejected authentication/TLS or
+client-ID eviction. MQTT permits only one active connection per client ID.
+
+The simulator overlay defaults to `solar-simulator`, distinct from the diagnostic
+gateway's `solar-gateway`. Override `SIMULATOR_MQTT_CLIENT_ID` when running multiple
+simulators or matching a provisioned status-topic ACL. The publisher now waits for
+CONNACK before startup succeeds and waits for automatic reconnection before
+publishing; bounded failures preserve the original sample/sequence for retry.
+
+After updating the checkout, `make up` starts the base services and `make simulate`
+rebuilds/recreates the simulator while retaining its checkpoint volume. Inspect
+`docker logs --since 2m solar-prototype-simulator-1` and
+`docker logs --since 2m solar-prototype-mosquitto-1` for fresh connection results.
+A logged SIGTERM means the process received a stop request; it does not identify
+why the MQTT session disconnected. Do not delete volumes or regenerate device
+credentials as a routine MQTT reconnect fix.

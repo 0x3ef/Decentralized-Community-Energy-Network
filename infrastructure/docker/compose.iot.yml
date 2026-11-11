@@ -13,6 +13,8 @@ services:
       SIMULATION_SPEED: 1
       FAULT_SCENARIO: none
       MQTT_HOST: mosquitto
+      # A concurrent diagnostic gateway must not evict this MQTT session.
+      MQTT_CLIENT_ID: ${SIMULATOR_MQTT_CLIENT_ID:-solar-simulator}
       MQTT_PORT: ${SIMULATOR_MQTT_PORT:-1883}
       MQTT_TLS: ${SIMULATOR_MQTT_TLS:-false}
       MQTT_CA_CERT: /run/simulation/ca.crt

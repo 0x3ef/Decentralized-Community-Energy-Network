@@ -150,3 +150,16 @@ Current private scenario results and encrypted wallets live under ignored
 `.run/demo`; the committed evidence contains public local transaction metadata only.
 Neither this documentation audit nor the prior integration published the cloud
 environment.
+
+## MQTT session recovery follow-up
+
+After the documentation audit, publisher startup/reconnection was corrected to
+wait for an acknowledged MQTT session, and the simulator overlay received a client
+ID distinct from the diagnostic gateway. The IoT suite was executed: **90 passed,
+85.14% coverage**. New regressions cover delayed CONNACK, failed startup cleanup,
+bounded disconnected publication and preservation of the sample on reconnection.
+A separate real Mosquitto stop/start probe detected disconnection, reconnected
+without recreating the publisher and delivered the next acknowledged telemetry
+message. Scoped Ruff, Compose configuration validation and whitespace checks passed.
+This verifies local transport recovery; it does not identify the cause of a remote
+user's broker disconnection or establish a new full financial scenario result.

@@ -6,7 +6,7 @@ import json
 import logging
 import ssl
 import time
-from threading import Lock
+from threading import Event, Lock
 from typing import Any
 
 import paho.mqtt.client as mqtt
@@ -50,6 +50,7 @@ class MqttPublisher:
         self._status_topic = f"solar/status/{client_id}"
         self._qos = qos
         self._lock = Lock()
+        self._connected = Event()
 
         self._client = mqtt.Client(
             callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
@@ -94,6 +95,13 @@ class MqttPublisher:
                 time.sleep(min(delay, max(0, deadline - time.monotonic())))
                 delay = min(5, delay * 2)
         self._client.loop_start()
+        # connect() opens the socket; only CONNACK establishes an MQTT session.
+        if not self._connected.wait(timeout=publish_timeout):
+            self._client.disconnect()
+            self._client.loop_stop()
+            raise ConnectionError(
+                "MQTT session was not established; check broker availability, TLS, credentials and client ID"
+            )
 
     def _on_connect(
         self,
@@ -104,11 +112,13 @@ class MqttPublisher:
         properties: Any = None,
     ) -> None:
         if rc == 0:
+            self._connected.set()
             client.publish(
                 self._status_topic, json.dumps({"state": "ONLINE"}), qos=1, retain=True
             )
             logger.info("Connected to MQTT broker")
         else:
+            self._connected.clear()
             logger.error("MQTT connection failed (rc=%s)", rc)
 
     def _on_disconnect(
@@ -119,6 +129,7 @@ class MqttPublisher:
         rc: int,
         properties: Any = None,
     ) -> None:
+        self._connected.clear()
         logger.warning("MQTT disconnected (rc=%s)", rc)
 
     def publish(self, topic: str, message: dict[str, Any]) -> None:
@@ -140,6 +151,12 @@ class MqttPublisher:
         if len(payload.encode()) > 65536:
             raise ValueError("Telemetry payload exceeds 64 KiB")
 
+        # Paho reconnects in its network thread. Preserve the original sample
+        # while waiting instead of publishing into a disconnected session.
+        if not self._connected.wait(timeout=self._timeout):
+            raise ConnectionError(
+                "MQTT remains disconnected; preserve sequence and retry after broker recovery"
+            )
         with self._lock:
             info = self._client.publish(topic, payload, qos=self._qos)
         if info.rc != mqtt.MQTT_ERR_SUCCESS:

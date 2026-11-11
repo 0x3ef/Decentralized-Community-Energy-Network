@@ -173,6 +173,7 @@ public JSON or checkpoint files.
 | --- | --- | --- |
 | `CLOUD_CA_BUNDLE` | `/etc/ssl/certs/ca-certificates.crt` | Combined CA bundle for BuildKit and runtime trust mounts |
 | `SIMULATOR_ENV_FILE`, `SIMULATOR_REGISTRY_FILE`, `SIMULATOR_CATALOGUE_FILE` | Required by simulation overlay | Host paths; `make demo` writes bindings in `.run/demo/compose.env` |
+| `SIMULATOR_MQTT_CLIENT_ID` | `solar-simulator` | Unique simulator session identity; keep distinct from concurrent gateways and align its status-topic ACL |
 | `SIMULATOR_MQTT_PORT`, `SIMULATOR_MQTT_TLS` | `1883`, `false` | Simulation overlay broker mode |
 | `SIMULATOR_CA_FILE` | System CA bundle | Public CA mounted into simulator |
 | `MQTT_PASSWORD_FILE`, `MQTT_ACL_FILE` | Required for authenticated overlays | Private broker files |
