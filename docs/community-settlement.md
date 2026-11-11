@@ -108,9 +108,18 @@ The [API guide](api.md) owns the route reference. Participants can read their ow
 claims, allocations, funding and statement; operators can calculate, inspect jobs,
 reconcile and explicitly retry terminal failed work. Unsigned native preparation
 supports deposits, withdrawals, SUN escrow, retirement and reservation cancellation.
-Governance preparation returns registry schedule/execute calls, not an automatic
-batch finalization. Full participant evidence manifests and batch-finalization
-preparation remain incomplete.
+Governance preparation returns unsigned registry or settlement schedule/execute
+calls. In the app, open **Liquidación**, select a reviewed lot, and follow
+**preparar la finalización del lote** to **Gobernanza**. The linked form selects
+**Finalizar lote energético** and its batch UUID. After the challenge period,
+the verified timelock proposer prepares, reviews and signs **Programar en timelock**,
+waits the configured timelock delay, then signs **Ejecutar acción autorizada**.
+The backend checks community ownership, current protocol bindings, on-chain batch
+state and timelock authority; it never signs these transactions. The worker then
+reconciles confirmed finalization and issues eligible producer SUN. Deposits are
+required for subsequent settlement, not for issuance. The dashboard's eligible
+export total is not a token balance or an issuance confirmation. Full participant
+evidence manifests remain incomplete.
 
 ## Worked and executed local scenario
 

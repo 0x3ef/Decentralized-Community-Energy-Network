@@ -61,6 +61,14 @@ Paths in this table are relative to `/api/v1`. Route spelling, including repeate
 | `POST /communities/{community_id}/settlements/{batch_id}/reconcile`, `POST /communities/{community_id}/settlements/{batch_id}/jobs/{job_id}/retry` | Explicit canonical audit or retry of terminal failed work |
 | `GET /system/status`, `GET /communities/{community_id}/operations/status` | Authenticated service status; operator lag/quality/reconciliation alerts |
 
+For batch approval, `governance/prepare` accepts
+`{"action":"finalize_batch","batch_id":"<batch UUID>"}`. The verified timelock
+proposer receives unsigned schedule/execute calldata targeting the community's
+settlement contract. Preparation requires a matching challengeable on-chain batch
+whose challenge period has elapsed. It does not submit a transaction or mint SUN;
+the authorized wallet signs both governance steps and the worker issues SUN after
+confirmed finalization.
+
 The live schema also includes energy and historical marketplace/community endpoints.
 Their presence does not make them active native ETH marketplace routes. No registered
 redemption HTTP router or global community directory is provided by `src.main`.

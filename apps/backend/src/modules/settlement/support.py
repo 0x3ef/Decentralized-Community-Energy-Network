@@ -6,7 +6,7 @@ from src.modules.community.service import CommunityService
 from src.modules.device.models import Device
 from src.modules.settlement.chain import NativeSettlementChain
 from src.modules.settlement.engine import key
-from src.modules.settlement.models import NativeWalletTransaction
+from src.modules.settlement.models import NativeWalletTransaction, SettlementBatch
 from web3 import Web3
 
 
@@ -20,8 +20,44 @@ class GovernanceService:
         wallet = await CommunityService().wallet(session, user.uid)
         cid = key(community_id)
         timelock = None
+        target = registry.address
         if payload.action == "apply_membership":
             function = registry.functions.applyMembership(cid)
+        elif payload.action == "finalize_batch":
+            from src.core.config import Config
+            from src.modules.settlement.chain import binary
+
+            if not Config.GOVERNANCE_TIMELOCK_ADDRESS:
+                raise PermissionError("Configured governance timelock required")
+            timelock = chain.contract(
+                "TimelockController", Config.GOVERNANCE_TIMELOCK_ADDRESS
+            )
+            if not timelock.functions.hasRole(
+                timelock.functions.PROPOSER_ROLE().call(), wallet
+            ).call():
+                raise PermissionError("Timelock proposer required")
+            if not payload.batch_id:
+                raise ValueError("Batch identifier required")
+            batch = await session.get(SettlementBatch, payload.batch_id)
+            if not batch or batch.community_id != community_id:
+                raise LookupError("Batch not found in this community")
+            _, _, _, settlement, _ = await chain.service.contracts(
+                session, community_id
+            )
+            if not settlement.functions.hasRole(
+                settlement.functions.DEFAULT_ADMIN_ROLE().call(), timelock.address
+            ).call():
+                raise PermissionError("Timelock is not this settlement's governor")
+            if not registry.functions.isActive(cid).call():
+                raise ValueError("Active community required")
+            state = settlement.functions.batches(binary(batch.chain_batch_id)).call()
+            if state[11] != 1 or Web3.to_hex(state[2]) != batch.root:
+                raise ValueError("Matching challengeable on-chain batch required")
+            deadline = state[5] + settlement.functions.challengePeriod().call()
+            if chain.web3.eth.get_block("latest").timestamp < deadline:
+                raise ValueError("Batch challenge period has not elapsed")
+            target = settlement.address
+            function = settlement.functions.finalize(binary(batch.chain_batch_id))
         else:
             # Return calldata for an authorized timelock/multisig, never execute as operator.
             role = (
@@ -76,7 +112,7 @@ class GovernanceService:
                 raise ValueError("Required node/meter identifiers missing")
         prepared = {
             "chain_id": chain.web3.eth.chain_id,
-            "to": registry.address,
+            "to": target,
             "data": function._encode_transaction_data(),
             "value": "0",
             "status": "AWAITING_GOVERNANCE_EXECUTION"
@@ -91,21 +127,21 @@ class GovernanceService:
             prepared["delay_seconds"] = delay
             prepared["operation_id"] = Web3.to_hex(
                 timelock.functions.hashOperation(
-                    registry.address, 0, data, bytes(32), salt
+                    target, 0, data, bytes(32), salt
                 ).call()
             )
             prepared["schedule"] = {
                 "to": timelock.address,
                 "value": "0",
                 "data": timelock.functions.schedule(
-                    registry.address, 0, data, bytes(32), salt, delay
+                    target, 0, data, bytes(32), salt, delay
                 )._encode_transaction_data(),
             }
             prepared["execute"] = {
                 "to": timelock.address,
                 "value": "0",
                 "data": timelock.functions.execute(
-                    registry.address, 0, data, bytes(32), salt
+                    target, 0, data, bytes(32), salt
                 )._encode_transaction_data(),
             }
         return prepared

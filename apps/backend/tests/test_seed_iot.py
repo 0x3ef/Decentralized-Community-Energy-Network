@@ -1,20 +1,21 @@
 """Canonical SQLModel seed and real energy persistence, without fabricated credits."""
 
-from datetime import datetime, UTC, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+
 import pytest
-from sqlmodel import select, func
+from sqlmodel import func, select
 from src.core.db import AsyncSessionFactory
-from src.seed import seed_demo, identifier
+from src.iot.mqtt_handler import _insert_batch
 from src.modules.auth.models import User
 from src.modules.auth.utils import verify_password
-from src.modules.home.models import Home
-from src.modules.device.models import Device
-from src.modules.wallet.models import Wallet
 from src.modules.community.models import MeterAuthorization
-from src.modules.energy.models import EnergyInterval, EnergyCredit
+from src.modules.device.models import Device
+from src.modules.energy.models import EnergyCredit, EnergyInterval
 from src.modules.energy.processor import EnergyProcessor
-from src.iot.mqtt_handler import _insert_batch
+from src.modules.home.models import Home
+from src.modules.wallet.models import Wallet
+from src.seed import identifier, seed_demo
 
 
 @pytest.mark.asyncio
@@ -74,16 +75,16 @@ async def test_seeded_physical_readings_create_only_observed_export_eligibility(
     monkeypatch,
 ):
     from config.homes import build_default_homes
-    from simulator.physics import HomeEnergyModel
-    from publishers.registered import RegisteredPublisher
-    from simulator.coordinator import Simulator, SimulationConfig
     from generators import (
+        BatteryGenerator,
         SmartMeterGenerator,
         SolarInverterGenerator,
         WeatherGenerator,
-        BatteryGenerator,
     )
     from models.sensor import SensorType
+    from publishers.registered import RegisteredPublisher
+    from simulator.coordinator import SimulationConfig, Simulator
+    from simulator.physics import HomeEnergyModel
 
     # Isolated clear-sky fixture removes weather/time-of-day dependence. Daily
     # solar variation is tested separately against the real solar model.
@@ -104,7 +105,8 @@ async def test_seeded_physical_readings_create_only_observed_export_eligibility(
         await db.commit()
 
         class RecordingTransport:
-            messages = []
+            def __init__(self):
+                self.messages = []
 
             def publish(self, topic, message):
                 self.messages.append({**message, "_mqtt_topic": topic})
@@ -137,16 +139,35 @@ async def test_seeded_physical_readings_create_only_observed_export_eligibility(
         end = datetime.now(UTC).replace(second=0, microsecond=0)
         end = end.replace(minute=end.minute // 15 * 15) - timedelta(minutes=15)
         start = end - timedelta(minutes=15)
-        sim.simulate_cycle(start)
-        sim.simulate_cycle(end)
-        assert len(transport.messages) == 30
+
+        # Exercise the production REALTIME scheduling path from an unaligned
+        # process start. The clock advances instead of sleeping for 15 minutes.
+        class Clock:
+            at = start - timedelta(seconds=4, microseconds=137)
+
+            def now(self):
+                return self.at
+
+        clock = Clock()
+
+        class Stop:
+            def is_set(self):
+                return clock.at > end
+
+            def wait(self, seconds):
+                clock.at += timedelta(seconds=seconds)
+
+        sim._clock = clock
+        sim.run(Stop())
+        count = 61 * 15
+        assert len(transport.messages) == count
         inserted, duplicates = await _insert_batch(
             db, transport.messages + transport.messages
         )
-        assert (inserted, duplicates) == (30, 30)
+        assert (inserted, duplicates) == (count, count)
         await db.commit()
         processor = EnergyProcessor()
-        await processor.process_pending(db)
+        await processor.process_pending(db, limit=count)
         await processor.finalize_closed_intervals(db)
         producer_home = next(
             row["home_id"]
@@ -183,6 +204,7 @@ async def test_seeded_physical_readings_create_only_observed_export_eligibility(
         )
         assert producer.eligible_export_wh == round(Decimal(exported) * 1000) > 0
         assert consumer.grid_import_wh > 0 and consumer.eligible_export_wh == 0
+        assert producer.quality_status == consumer.quality_status == "FINALIZED"
         credit = (
             await db.exec(
                 select(EnergyCredit).where(EnergyCredit.interval_id == producer.id)
@@ -192,7 +214,7 @@ async def test_seeded_physical_readings_create_only_observed_export_eligibility(
             credit.energy_wh == producer.eligible_export_wh
             and credit.status == "PENDING"
         )
-        assert await _insert_batch(db, transport.messages) == (0, 30)
+        assert await _insert_batch(db, transport.messages) == (0, count)
         await db.commit()
         await processor.process_pending(db)
         await processor.finalize_closed_intervals(db)
@@ -206,7 +228,8 @@ async def test_seeded_physical_readings_create_only_observed_export_eligibility(
 
 
 def test_seed_registers_all_mapper_relationships_in_a_fresh_python_process():
-    import subprocess, sys
+    import subprocess
+    import sys
 
     result = subprocess.run(
         [

@@ -129,6 +129,7 @@ Unless otherwise stated, each is optional and its default is shown.
 | Variable | Default / format | Purpose |
 | --- | --- | --- |
 | `INTERVAL_SECONDS` | `15`, positive number | Sampling cycle, not settlement interval |
+| `ACCOUNTING_INTERVAL_SECONDS` | `900`, positive integer | REALTIME boundary sampling; must match the governed accounting interval |
 | `RANDOM_SEED`, `SEQUENCE_OFFSET` | Unset; integers | Reproducible per-home RNG; CLI uses epoch offset if omitted |
 | `DEVICE_REGISTRY` | Unset; JSON file path | Required for registered MQTT simulation; public UUIDs and credential environment names |
 | `HOME_CATALOGUE_FILE` | Unset; JSON file path | Optional explicit home/sensor catalogue |

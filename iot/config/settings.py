@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
 from datetime import datetime
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import Field
@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     )
 
     interval_seconds: float = Field(default=15.0, gt=0)
+    accounting_interval_seconds: int = Field(default=900, gt=0)
     checkpoint_path: str | None = None
     device_registry: str | None = None
     home_profiles_json: str = "{}"

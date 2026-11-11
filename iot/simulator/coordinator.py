@@ -39,6 +39,7 @@ class SimulationConfig:
     start: datetime | None = None
     fault: str = "none"
     fault_device: str | None = None
+    accounting_interval_seconds: int = 900
 
     def __post_init__(self) -> None:
         if self.fault not in (
@@ -77,6 +78,8 @@ class SimulationConfig:
             raise ValueError("Offline mode requires explicit start and v2 provenance")
         if self.interval_seconds <= 0:
             raise ValueError("interval_seconds must be greater than zero")
+        if self.accounting_interval_seconds <= 0:
+            raise ValueError("accounting_interval_seconds must be greater than zero")
         if self.sequence_offset < 0:
             raise ValueError("sequence_offset cannot be negative")
 
@@ -320,6 +323,29 @@ class Simulator:
         """Run simulation cycles until ``stop_event`` is set."""
         stop_event = stop_event or Event()
         logger.info("Starting simulation with %d homes", len(self._homes))
+
+        if self._config.mode == "REALTIME":
+            from simulator.clock import next_sample_at
+
+            step = self._config.interval_seconds
+            boundary = self._config.accounting_interval_seconds
+            while not stop_event.is_set():
+                target = next_sample_at(self._clock.now(), step, boundary)
+                # Wait for the observation time; don't publish future readings.
+                while not stop_event.is_set():
+                    now = self._clock.now()
+                    remaining = (target - now).total_seconds()
+                    if remaining <= 0:
+                        break
+                    stop_event.wait(remaining)
+                if stop_event.is_set():
+                    break
+                if (now - target).total_seconds() >= min(step, boundary):
+                    logger.warning("Missed sampling slot %s; no backfill", target)
+                    continue
+                self.simulate_cycle(target)
+            logger.info("Simulation stopped")
+            return
 
         while not stop_event.is_set():
             cycle_started = time.monotonic()

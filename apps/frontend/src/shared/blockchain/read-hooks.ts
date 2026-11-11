@@ -66,11 +66,12 @@ export function useTimelock(prepared: Prepared) {
           functionName,
           args: [prepared.operation_id as Hex],
         }) as Promise<boolean>;
-      const [ready, done] = await Promise.all([
+      const [ready, done, pending] = await Promise.all([
         read("isOperationReady"),
         read("isOperationDone"),
+        read("isOperationPending"),
       ]);
-      return { ready, done };
+      return { ready, done, pending };
     },
     refetchInterval: 15_000,
     retry: false,

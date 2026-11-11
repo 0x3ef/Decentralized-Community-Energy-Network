@@ -90,12 +90,19 @@ class GovernancePrepare(BaseModel):
         pattern=r"^0x[0-9a-fA-F]{64}$",
     )
     action: Literal[
-        "apply_membership", "transition", "membership", "node", "meter", "price"
+        "apply_membership",
+        "transition",
+        "membership",
+        "node",
+        "meter",
+        "price",
+        "finalize_batch",
     ]
     status: int = Field(default=0, ge=0, le=7)
     address: str = Field(default="0x" + "0" * 40, pattern=r"^0x[0-9a-fA-F]{40}$")
     node_id: UUID | None = None
     meter_id: UUID | None = None
+    batch_id: UUID | None = None
     active: bool = True
     price_wei_per_kwh: str = Field(default="0", pattern=r"^\d+$", max_length=78)
 

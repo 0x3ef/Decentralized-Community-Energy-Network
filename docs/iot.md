@@ -243,6 +243,14 @@ of eligible injection. Matching processed boundary readings are required.
 The default simulator cycle is 15 seconds; this is separate from the default
 900-second accounting interval. Configuration, complete simulator controls and
 transport security settings are defined in [configuration](configuration.md).
+The continuous REALTIME loop waits for UTC sampling slots and explicitly includes
+every accounting boundary. Starting at an arbitrary second no longer shifts all
+measurements away from the boundaries. `ACCOUNTING_INTERVAL_SECONDS` must match
+the governed interval (900 by default), including when the sampling cadence does
+not divide it. Missed slots are not backfilled; outages can still leave incomplete
+intervals. A partial startup interval is not made eligible retroactively. Allow a
+complete observed interval plus the two-minute grace period, then governance
+review/finalization and chain confirmations before expecting issued SUN.
 Use `make simulate` after `make demo` for the registered continuous fixture; see
 [getting started](getting-started.md#start-continuous-simulation).
 
