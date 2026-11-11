@@ -55,14 +55,24 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+  anvil-state-init:
+    image: ghcr.io/foundry-rs/foundry:v1.5.0
+    user: '0:0'
+    entrypoint: [sh, -c]
+    command: ["chown -R 1000:1000 /state && chmod 0700 /state"]
+    volumes: [anvil_state:/state]
+    restart: 'no'
   anvil:
     image: ghcr.io/foundry-rs/foundry:v1.5.0
     entrypoint: [anvil, --host, 0.0.0.0, --chain-id, "31337", --block-time, "1"]
     ports: ["127.0.0.1:8545:8545"]
     volumes: [anvil_state:/state]
     command: [--state, /state/anvil.json, --state-interval, "5", --preserve-historical-states]
+    stop_grace_period: 60s
+    depends_on:
+      anvil-state-init: {condition: service_completed_successfully}
     healthcheck:
-      test: [CMD, cast, chain-id, --rpc-url, http://127.0.0.1:8545]
+      test: [CMD-SHELL, "cast chain-id --rpc-url http://127.0.0.1:8545 >/dev/null && test -s /state/anvil.json"]
       interval: 5s
       timeout: 4s
       retries: 20

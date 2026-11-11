@@ -96,6 +96,64 @@ Broker authentication/TLS provisioning is documented in [IoT](iot.md#broker-acls
 The local fixed database credentials and anonymous broker must not be exposed as
 a public production system.
 
+## Recover a local demo after lost Anvil state
+
+If RPC is healthy but the database's registry address has zero bytecode, the
+current node does not contain that deployment. An empty `/state` volume cannot
+restore it. Do not point historical SQL balances at newly deployed contracts.
+Use a known valid external chain backup if one exists; the workflow below creates
+a **replacement demonstration**, not a restoration of old on-chain history.
+
+The named-volume persistence defect was reproduced: Docker creates a new `/state`
+mount owned by root, while the Foundry image runs as UID 1000. The corrected
+`anvil-state-init` one-off service assigns that specific volume to UID/GID 1000
+with private directory permissions. Anvil health now requires both RPC and a
+nonempty periodic state file. A graceful stop allows 60 seconds for its state dump;
+an abrupt kill can still lose changes since the latest successful periodic save.
+
+From the repository root, with the Python environment active, contract artifacts
+compiled and the local node reachable:
+
+```bash
+python scripts/recover_local_demo.py   # read-only preflight
+make recover-demo                    # explicitly archive and replace the demo
+```
+
+Recovery refuses nondevelopment/public RPC configurations and refuses an intact
+registry. It stops the old Compose project, creates a private PostgreSQL custom
+archive and retains the old containers/volumes. Old settings, encrypted wallets,
+bootstrap/scenario journals and browser fixture tokens are archived under a
+mode-0700 `.run/recovery-*` directory. The dump/settings are private; never commit
+or publish that directory. The archive does not recreate missing chain receipts.
+
+A new `solar-recovery-*` Compose project receives independent SQL, MQTT, simulation
+and EVM volumes, freshly generated JWT/oracle/seed credentials and a newly governed
+community. `COMPOSE_PROJECT_NAME` is persisted in `infrastructure/docker/.env`, so
+subsequent Make/bootstrap commands address the replacement. Keep shell overrides
+unset. No volume is deleted, and old balances/credits are not copied into the new
+financial environment. If any stage fails, preserve the archive and partial new
+project; inspect its stage before resuming setup/bootstrap instead of deleting it.
+
+The command checks the state file, restarts the new Anvil, verifies the genesis
+and all five deployed contracts, and reruns idempotent bootstrap to re-unlock only
+the local fixture accounts. Then run:
+
+```bash
+make demo-scenario
+make simulate
+make ps
+```
+
+Close the old app session and use the **new** `SEED_PASSWORD` and new encrypted
+wallets. These replacement credentials differ from the archived demo. Container
+names now start with the recovery project name; prefer Compose service commands
+over old hardcoded `solar-prototype-*` container names.
+
+The original database remains accessible through its retained container or the
+private dump. Restoring that dump into a disposable inspection database can recover
+off-chain records, not their lost blockchain state. This workflow is local-only and
+must never serve as a public-network payment or accounting migration.
+
 ## Sepolia deployment and commissioning
 
 This is an explicit public-testnet procedure, not a claim that deployment occurred.

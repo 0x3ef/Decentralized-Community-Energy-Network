@@ -171,6 +171,7 @@ public JSON or checkpoint files.
 
 | Variable | Default / requirement | Purpose |
 | --- | --- | --- |
+| `COMPOSE_PROJECT_NAME` | `solar-prototype` through the Compose file; recovery writes a unique project name into the private backend env file | Selects isolated containers/volumes; shell overrides must be unset before recovery |
 | `CLOUD_CA_BUNDLE` | `/etc/ssl/certs/ca-certificates.crt` | Combined CA bundle for BuildKit and runtime trust mounts |
 | `SIMULATOR_ENV_FILE`, `SIMULATOR_REGISTRY_FILE`, `SIMULATOR_CATALOGUE_FILE` | Required by simulation overlay | Host paths; `make demo` writes bindings in `.run/demo/compose.env` |
 | `SIMULATOR_MQTT_CLIENT_ID` | `solar-simulator` | Unique simulator session identity; keep distinct from concurrent gateways and align its status-topic ACL |
