@@ -1,7 +1,7 @@
 """Explicit wall-time and accelerated offline simulation clocks."""
 
-from datetime import datetime, UTC, timedelta
 import time
+from datetime import UTC, datetime, timedelta
 
 
 class SimulationClock:
@@ -22,3 +22,18 @@ class SimulationClock:
         return self.start + timedelta(
             seconds=(time.monotonic() - self.origin) * self.speed
         )
+
+
+class DeterministicClock:
+    """No wall clock: each cycle has an explicit reproducible UTC timestamp."""
+
+    def __init__(self, start: datetime, step_seconds: float):
+        if start.tzinfo is None or step_seconds <= 0:
+            raise ValueError("Aware start and positive step required")
+        self.current = start.astimezone(UTC)
+        self.step = timedelta(seconds=step_seconds)
+
+    def now(self):
+        current = self.current
+        self.current += self.step
+        return current

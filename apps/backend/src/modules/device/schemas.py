@@ -1,6 +1,6 @@
 from uuid import UUID
 from datetime import datetime
-from typing import List
+from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
@@ -8,7 +8,8 @@ from pydantic import BaseModel, Field
 class DeviceCreateModel(BaseModel):
     home_id: UUID
     device_code: str = Field(min_length=1, max_length=100)
-    device_type: str = Field(pattern="^(SMART_METER|INVERTER|BATTERY)$")
+    device_type: str = Field(pattern="^(SMART_METER|INVERTER|BATTERY|WEATHER_SENSOR)$")
+    telemetry_source: Literal["PHYSICAL","SIMULATED"] = "PHYSICAL"
     manufacturer: str | None = None
     model: str | None = None
     serial_number: str | None = None

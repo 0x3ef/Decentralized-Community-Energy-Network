@@ -51,7 +51,7 @@ async def seed_demo(
     community = await session.get(EnergyCommunity, community_id)
     if community is None:
         session.add(
-            EnergyCommunity(id=community_id, name="Cali demonstration community")
+            EnergyCommunity(id=community_id, name="Cali demonstration community",allow_simulated_telemetry=True)
         )
         await session.flush()
     registry = {}
@@ -166,6 +166,7 @@ async def seed_demo(
                     home_id=home_id,
                     device_code=device_code,
                     device_type=kind,
+                    telemetry_source="SIMULATED",
                     mqtt_client_id="demo-" + device_code,
                     status="ACTIVE" if device_key else "PENDING",
                 )
@@ -180,6 +181,8 @@ async def seed_demo(
                 "device_id": str(device.device_id),
                 "home_id": str(home_id),
                 "credential_env": binding,
+                "community_id": str(community_id),
+                "node_id": str(node_id),
             }
             if device_key:
                 credential = hmac.new(

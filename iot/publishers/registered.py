@@ -2,13 +2,14 @@
 
 import json
 import os
+from pathlib import Path
 from uuid import UUID
 
 
 class RegisteredPublisher:
     def __init__(self, publisher, registry_path: str):
         self.publisher = publisher
-        self.registry = json.loads(open(registry_path, encoding="utf-8").read())
+        self.registry = json.loads(Path(registry_path).read_text(encoding="utf-8"))
         for entry in self.registry.values():
             UUID(entry["device_id"])
             UUID(entry["home_id"])
@@ -25,9 +26,14 @@ class RegisteredPublisher:
             "home_id": entry["home_id"],
             "credential": os.environ[entry["credential_env"]],
         }
-        self.publisher.publish(
-            f"solar/{entry['home_id']}/{entry['device_id']}/telemetry", payload
-        )
+        if message.get("schema_version") == "2.0":
+            if not entry.get("community_id") or not entry.get("node_id"):
+                raise ValueError("v2 registry requires approved community and node IDs")
+            payload.update(community_id=entry["community_id"], node_id=entry["node_id"])
+            topic = f"solar/{entry['community_id']}/{entry['node_id']}/{entry['device_id']}/telemetry"
+        else:
+            topic = f"solar/{entry['home_id']}/{entry['device_id']}/telemetry"
+        self.publisher.publish(topic, payload)
 
     def close(self):
         self.publisher.close()

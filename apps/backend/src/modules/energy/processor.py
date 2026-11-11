@@ -54,11 +54,26 @@ class EnergyProcessor:
             try:
                 async with session.begin_nested():
                     await self._process_message(session, message)
-                message.quality_status = "PROCESSED"
+                if message.quality_status == "valid":
+                    message.quality_status = "PROCESSED"
                 processed += 1
-            except ValueError as exc:
+            except (ValueError, PermissionError) as exc:
                 message.quality_status = "REJECTED"
                 message.validation_errors = [{"reason": str(exc)}]
+                from src.iot.quality import assess
+
+                state = "OUT_OF_ORDER" if "Out-of-order" in str(exc) else "SUSPECT"
+                await assess(
+                    session, message.payload, state, str(exc), message.device_id
+                )
+                if message.payload.get("sensor_type") == "smart_meter":
+                    from src.iot.quality import quarantine
+                    from src.iot.telemetry_validator import Envelope
+
+                    device = await session.get(Device, message.device_id)
+                    await quarantine(
+                        session, device, Envelope.model_validate(message.payload)
+                    )
                 logger.warning("Rejected energy sample %s: %s", message.id, exc)
         await session.commit()
         return processed
@@ -79,9 +94,59 @@ class EnergyProcessor:
 
         if device.status != "ACTIVE":
             raise ValueError("Meter authorization revoked")
+        from src.modules.community.models import (
+            MeterAuthorization,
+            CommunityNode,
+            EnergyCommunity,
+        )
+
+        authorization = await session.get(MeterAuthorization, device.id)
+        node = (
+            await session.get(CommunityNode, authorization.node_id)
+            if authorization
+            else None
+        )
+        community = (
+            await session.get(EnergyCommunity, node.community_id) if node else None
+        )
+        if (
+            not authorization
+            or not authorization.active
+            or not node
+            or not node.authorized
+            or not community
+            or community.status != "ACTIVE"
+        ):
+            raise ValueError("Community or meter authorization is inactive")
+        if community.registry_address:
+            from src.modules.community.service import CommunityService
+            from src.modules.community.chain import CommunityChain
+
+            await CommunityService().membership(session, community.id, home.owner_id)
+            registry = CommunityChain().contract(
+                "CommunityRegistry", community.registry_address
+            )
+            key = community.id.bytes.rjust(32, b"\0")
+            if registry.functions.meters(
+                key, device.device_id.bytes.rjust(32, b"\0")
+            ).call() != node.id.bytes.rjust(32, b"\0"):
+                raise ValueError("Meter authorization revoked on chain")
+        from src.iot.quality import source_error
+        from src.iot.telemetry_validator import Envelope
+
+        issue = source_error(
+            device,
+            community,
+            Envelope.model_validate(message.payload),
+            registry.w3.eth.chain_id if community.registry_address else None,
+        )
+        if issue:
+            raise ValueError(issue)
+        minutes = community.interval_seconds / 60
         envelope = message.payload or {}
         sensor_type = envelope.get("sensor_type")
         data = envelope.get("data") or {}
+        quality_flags = set()
         deltas = {
             "generation_wh": 0,
             "consumption_wh": 0,
@@ -100,6 +165,8 @@ class EnergyProcessor:
                     "lifetime_generation",
                     int(reading.lifetime_energy_wh),
                     message.measured_at,
+                    minutes,
+                    quality_flags,
                 )
         elif sensor_type == "smart_meter":
             reading = await self._reading(session, SmartMeter, message.id)
@@ -117,6 +184,8 @@ class EnergyProcessor:
                             counter_name,
                             int(value),
                             message.measured_at,
+                            minutes,
+                            quality_flags,
                         )
 
         if sensor_type == "battery_monitor":
@@ -124,13 +193,53 @@ class EnergyProcessor:
             if reading:
                 for field in ("charge", "discharge"):
                     power = getattr(reading, f"{field}_power_w")
-                    if power is not None:
+                    counter = getattr(reading, f"cumulative_{field}_wh")
+                    if counter is not None:
+                        deltas[f"battery_{field}_wh"] = await self._counter_delta(
+                            session,
+                            device.id,
+                            f"battery_{field}",
+                            counter,
+                            message.measured_at,
+                            minutes,
+                            quality_flags,
+                        )
+                    elif power is not None:
                         deltas[f"battery_{field}_wh"] = await self._power_delta(
-                            session, device.id, field, power, message.measured_at
+                            session,
+                            device.id,
+                            field,
+                            power,
+                            message.measured_at,
+                            minutes,
                         )
 
+        if quality_flags - {"COUNTER_ROLLOVER"}:
+            from src.iot.quality import assess
+
+            message.quality_status = (
+                "COUNTER_RESET" if "COUNTER_RESET" in quality_flags else "COUNTER_GAP"
+            )
+            await assess(
+                session,
+                message.payload,
+                message.quality_status,
+                "Baseline re-established; no energy delta accepted",
+                device.id,
+            )
+            return
+        if "COUNTER_ROLLOVER" in quality_flags:
+            from src.iot.quality import assess
+
+            await assess(
+                session,
+                message.payload,
+                "COUNTER_ROLLOVER",
+                "Configured modulus and power limit verified",
+                device.id,
+            )
         start, end = self.calculator.interval_bounds(
-            message.measured_at - timedelta(microseconds=1), INTERVAL_MINUTES
+            message.measured_at - timedelta(microseconds=1), minutes
         )
         interval_result = await session.exec(
             select(EnergyInterval)
@@ -176,7 +285,14 @@ class EnergyProcessor:
         return result.first()
 
     async def _counter_delta(
-        self, session, device_id, counter_name, current_value, measured_at
+        self,
+        session,
+        device_id,
+        counter_name,
+        current_value,
+        measured_at,
+        minutes=INTERVAL_MINUTES,
+        flags=None,
     ) -> int:
         result = await session.exec(
             select(DeviceCounterSnapshot)
@@ -201,19 +317,42 @@ class EnergyProcessor:
         if measured_at <= snapshot.measured_at:
             raise ValueError("Out-of-order counter reading")
         interval_start, interval_end = self.calculator.interval_bounds(
-            measured_at - timedelta(microseconds=1), INTERVAL_MINUTES
+            measured_at - timedelta(microseconds=1), minutes
         )
         if snapshot.measured_at < interval_start:
-            logger.warning("Counter gap: establishing baseline without energy credit, device=%s channel=%s", device_id,counter_name)
-            snapshot.counter_value_wh=current_value
-            snapshot.measured_at=measured_at
+            logger.warning(
+                "Counter gap: establishing baseline without energy credit, device=%s channel=%s",
+                device_id,
+                counter_name,
+            )
+            snapshot.counter_value_wh = current_value
+            snapshot.measured_at = measured_at
+            if flags is not None:
+                flags.add("COUNTER_GAP")
             return 0
         delta = self.calculator.counter_delta(snapshot.counter_value_wh, current_value)
+        device = await session.get(Device, device_id)
+        rollover = False
+        if current_value < snapshot.counter_value_wh and device.counter_modulus_wh:
+            modulus = device.counter_modulus_wh
+            if (
+                snapshot.counter_value_wh < modulus
+                and snapshot.counter_value_wh >= modulus * 9 // 10
+                and current_value <= modulus // 10
+            ):
+                delta = modulus - snapshot.counter_value_wh + current_value
+                rollover = True
+                if flags is not None:
+                    flags.add("COUNTER_ROLLOVER")
+
         from src.core.config import Config
-        elapsed=Decimal(str((measured_at-snapshot.measured_at).total_seconds()))
-        if Decimal(delta)>Decimal(Config.MAX_METER_POWER_W)*elapsed/3600+2:
+
+        elapsed = Decimal(str((measured_at - snapshot.measured_at).total_seconds()))
+        if Decimal(delta) > Decimal(Config.MAX_METER_POWER_W) * elapsed / 3600 + 2:
             raise ValueError("Counter spike exceeds configured maximum meter power")
-        if current_value < snapshot.counter_value_wh:
+        if current_value < snapshot.counter_value_wh and not rollover:
+            if flags is not None:
+                flags.add("COUNTER_RESET")
             logger.warning(
                 "Counter reset detected: device=%s counter=%s",
                 device_id,
@@ -231,6 +370,7 @@ class EnergyProcessor:
         channel: str,
         power: Decimal,
         measured_at: datetime,
+        minutes=INTERVAL_MINUTES,
     ) -> int:
         snapshot = await session.get(EnergyPowerSnapshot, (device_id, channel))
         if snapshot is None:
@@ -244,7 +384,7 @@ class EnergyProcessor:
             )
             return 0
         start, _ = self.calculator.interval_bounds(
-            measured_at - timedelta(microseconds=1), INTERVAL_MINUTES
+            measured_at - timedelta(microseconds=1), minutes
         )
         if measured_at <= snapshot.measured_at or snapshot.measured_at < start:
             raise ValueError(
@@ -298,6 +438,44 @@ class EnergyProcessor:
                 interval.quality_status = "REJECTED"
                 continue
             community = await session.get(EnergyCommunity, node.community_id)
+            if community.status != "ACTIVE":
+                interval.quality_status = "REJECTED"
+                continue
+            if community.registry_address:
+                from src.modules.community.service import CommunityService
+
+                try:
+                    await CommunityService().membership(
+                        session, community.id, home.owner_id
+                    )
+                except PermissionError:
+                    interval.quality_status = "REJECTED"
+                    continue
+            evidence = (
+                await session.exec(
+                    select(TelemetryMessage)
+                    .join(Device, Device.id == TelemetryMessage.device_id)
+                    .where(
+                        Device.home_id == home.id,
+                        Device.device_type == "smart_meter",
+                        TelemetryMessage.measured_at >= interval.interval_start,
+                        TelemetryMessage.measured_at <= interval.interval_end,
+                    )
+                    .order_by(TelemetryMessage.measured_at)
+                )
+            ).all()
+            if any(m.quality_status == "valid" for m in evidence):
+                continue
+            if any(m.quality_status != "PROCESSED" for m in evidence):
+                interval.quality_status = "REJECTED"
+                continue
+            if (
+                len(evidence) < 2
+                or evidence[0].measured_at != interval.interval_start
+                or evidence[-1].measured_at != interval.interval_end
+            ):
+                interval.quality_status = "INCOMPLETE"
+                continue
             if interval.eligible_export_wh > 0:
                 existing = await session.exec(
                     select(EnergyCredit).where(

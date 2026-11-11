@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
 import signal
 import time
 from contextlib import suppress
+from decimal import Decimal
 from threading import Event
 
 from config.homes import build_default_homes
@@ -43,6 +43,12 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s - %(message)s",
     )
 
+    if settings.use_grpc and (
+        settings.device_registry or settings.simulation_mode != "REALTIME"
+    ):
+        raise ValueError(
+            "Registered or offline simulation requires v2 direct MQTT; use USE_GRPC=false"
+        )
     generators: dict[SensorType, SensorGenerator] = {
         SensorType.SMART_METER: SmartMeterGenerator(
             use_grpc=settings.use_grpc,
@@ -64,15 +70,15 @@ def main() -> None:
 
     publisher = None
     if not settings.use_grpc:
-        if settings.device_registry:
-            from publishers.registered import RegisteredPublisher
+        if settings.device_registry and settings.publisher.value != "console":
             from publishers.mqtt_publisher import MqttPublisher
+            from publishers.registered import RegisteredPublisher
 
             publisher = RegisteredPublisher(
                 MqttPublisher(
                     settings.mqtt_host,
                     settings.mqtt_port,
-                    client_id="solar-registered-simulator",
+                    client_id=settings.mqtt_client_id,
                     username=settings.mqtt_username,
                     password=settings.mqtt_password,
                     tls=settings.mqtt_tls,
@@ -87,26 +93,39 @@ def main() -> None:
 
             publisher = ConsolePublisher()
     import json
+
     from simulator.physics import HomeProfile
 
     profiles = {
         key: HomeProfile(
             **{
                 k: Decimal(str(v))
-                if k not in ("latitude", "longitude", "timezone")
+                if k not in ("latitude", "longitude", "timezone", "usage")
                 else v
                 for k, v in value.items()
             }
         )
         for key, value in json.loads(settings.home_profiles_json).items()
     }
+    homes = build_default_homes()
+    if settings.home_catalogue_file:
+        from config.homes import load_catalogue
+
+        homes, catalogue_profiles = load_catalogue(settings.home_catalogue_file)
+        profiles = {**catalogue_profiles, **profiles}
     simulator = Simulator(
         profiles=profiles,
-        homes=build_default_homes(),
+        homes=homes,
         generators=generators,
         publisher=publisher,
         config=SimulationConfig(
             interval_seconds=settings.interval_seconds,
+            mode=settings.simulation_mode,
+            speed=settings.simulation_speed,
+            start=settings.simulation_start,
+            fault=settings.fault_scenario,
+            fault_device=settings.fault_device,
+            telemetry_version="1.0" if settings.use_grpc else "2.0",
             random_seed=settings.random_seed,
             checkpoint_path=settings.checkpoint_path,
             # A fresh process must not replay low sequence numbers because
@@ -123,7 +142,13 @@ def main() -> None:
     _install_signal_handlers(stop_event)
 
     try:
-        simulator.run(stop_event=stop_event)
+        if settings.max_cycles:
+            for _ in range(settings.max_cycles):
+                if stop_event.is_set():
+                    break
+                simulator.simulate_cycle()
+        else:
+            simulator.run(stop_event=stop_event)
     finally:
         close_channel()
         if publisher is not None:

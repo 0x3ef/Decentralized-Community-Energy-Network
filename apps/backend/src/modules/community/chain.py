@@ -49,6 +49,13 @@ class CommunityChain:
     async def deployment(
         self, session: AsyncSession, community_id: UUID
     ) -> ChainDeployment:
+        from src.modules.community.models import EnergyCommunity
+
+        community = await session.get(EnergyCommunity, community_id)
+        if community and community.registry_address:
+            raise ValueError(
+                "Governed communities use native ETH deployment and finalized proof claims"
+            )
         deployment = await session.get(ChainDeployment, community_id)
         if not deployment or deployment.chain_id != self.web3.eth.chain_id:
             raise ValueError(
@@ -87,6 +94,18 @@ class CommunityChain:
         ).first()
         if existing:
             return existing
+        community_id = UUID(event.payload["community_id"])
+        from src.modules.community.models import EnergyCommunity
+
+        community = await session.get(EnergyCommunity, community_id)
+        if community is None or community.status != "ACTIVE":
+            raise ValueError(
+                "Governance activation is required before processing outbox events"
+            )
+        if community.registry_address:
+            raise ValueError(
+                "Governed deployments require finalized settlement Merkle claims; legacy oracle shortcuts are disabled"
+            )
         account = self.web3.eth.account.from_key(Config.BACKEND_PRIVATE_KEY)
         deployment = await self.deployment(session, UUID(event.payload["community_id"]))
         if event.event_type == "community.credit.issue":
@@ -145,17 +164,22 @@ class CommunityChain:
             ).functions.setMember(wallet, membership.status == "ACTIVE")
         else:
             raise ValueError("Unsupported community outbox operation")
+        return await self.sign_operation(session, event, function, deployment.chain_id)
+
+    async def sign_operation(self, session, event, function, chain_id):
+        """Shared signer/nonce journal for legacy and native protocol workers."""
+        account = self.web3.eth.account.from_key(Config.BACKEND_PRIVATE_KEY)
         # PostgreSQL transaction lock coordinates every worker sharing the signer.
         lock = int.from_bytes(
-            Web3.keccak(text=f"{deployment.chain_id}:{account.address}")[:8],
+            Web3.keccak(text=f"{chain_id}:{account.address}")[:8],
             "big",
             signed=True,
         )
-        await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock})
+        await session.exec(text("SELECT pg_advisory_xact_lock(:key)"), params={"key": lock})
         maximum = (
             await session.exec(
                 select(func.max(ChainOperation.nonce)).where(
-                    ChainOperation.chain_id == deployment.chain_id,
+                    ChainOperation.chain_id == chain_id,
                     ChainOperation.sender == account.address,
                 )
             )
@@ -177,14 +201,14 @@ class CommunityChain:
             {
                 "from": account.address,
                 "nonce": nonce,
-                "chainId": deployment.chain_id,
+                "chainId": chain_id,
                 **fees,
             }
         )
         signed = account.sign_transaction(transaction)
         operation = ChainOperation(
             outbox_id=event.id,
-            chain_id=deployment.chain_id,
+            chain_id=chain_id,
             sender=account.address,
             nonce=nonce,
             transaction_hash=Web3.to_hex(signed.hash),
@@ -246,9 +270,7 @@ class CommunityChain:
                     ).one()
                     for attempt in stored.previous_transactions:
                         try:
-                            self.web3.eth.get_transaction_receipt(
-                                attempt["hash"]
-                            )
+                            self.web3.eth.get_transaction_receipt(attempt["hash"])
                         except TransactionNotFound:
                             continue
                         stored.transaction_hash = attempt["hash"]
@@ -528,6 +550,14 @@ class CommunityChain:
                 seller=args.seller,
                 sun_units=Decimal(args.amount),
                 payment_units=Decimal(args.totalPaid),
+                payment_asset=(
+                    "USDx_SIMULATED_USD"
+                    if self.contract("MockUSD", deployment.payment_address)
+                    .functions.name()
+                    .call()
+                    .startswith("Simulated US Dollar")
+                    else "USDx_SIMULATED_PESO"
+                ),
                 transaction_hash=tx_hash,
                 log_index=event.logIndex,
                 block_hash=Web3.to_hex(receipt.blockHash),

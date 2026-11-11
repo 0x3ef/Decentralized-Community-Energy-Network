@@ -18,6 +18,7 @@ import src.modules.device.models  # noqa: F401,E402
 import src.modules.energy.models  # noqa: F401,E402
 import src.modules.wallet.models  # noqa: F401,E402
 import src.modules.community.models  # noqa: F401
+import src.modules.settlement.models  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", Config.DATABASE_URL.replace("%", "%%"))

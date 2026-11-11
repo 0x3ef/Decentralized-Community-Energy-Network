@@ -1,0 +1,7 @@
+[
+  {"home_id":"HOME-MS-003","city":"Cali","solar_kw":0,"battery_kwh":0,"profile":"consumer"},
+  {"home_id":"HOME-MS-002","city":"Cali","solar_kw":6,"battery_kwh":0,"profile":"solar_producer"},
+  {"home_id":"HOME-MS-005","city":"Cali","solar_kw":3,"battery_kwh":0,"profile":"prosumer"},
+  {"home_id":"HOME-MS-001","city":"Cali","solar_kw":4,"battery_kwh":10,"profile":"battery_prosumer"},
+  {"home_id":"HOME-MS-004","city":"Cali","solar_kw":0,"battery_kwh":5,"profile":"commercial"}
+]

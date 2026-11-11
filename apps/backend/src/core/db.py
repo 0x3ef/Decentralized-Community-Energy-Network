@@ -50,6 +50,8 @@ async def initdb() -> None:
     import src.modules.device.models  # noqa: F401
     import src.modules.energy.models  # noqa: F401
     import src.modules.wallet.models  # noqa: F401
+    import src.modules.community.models  # noqa: F401
+    import src.modules.settlement.models  # noqa: F401
 
     async with async_engine.begin() as connection:
         await connection.run_sync(SQLModel.metadata.create_all)

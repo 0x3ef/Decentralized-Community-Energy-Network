@@ -16,12 +16,17 @@ async def run():
         asyncio.get_running_loop().add_signal_handler(sig, stop.set)
     processor = EnergyProcessor()
     chain = CommunityChain()
+    from src.modules.settlement.worker import NativeSettlementWorker
+    from src.core.config import Config
+    native = NativeSettlementWorker()
     try:
         while not stop.is_set():
             try:
                 async with AsyncSessionFactory() as session:
                     await processor.process_pending(session)
                     await processor.finalize_closed_intervals(session)
+                if Config.NATIVE_SETTLEMENT_ENABLED:
+                    await native.run_once(AsyncSessionFactory)
                 await chain.audit_confirmed(AsyncSessionFactory)
                 await chain.process_outbox(AsyncSessionFactory)
                 await chain.sync_events(AsyncSessionFactory)

@@ -1,3 +1,6 @@
+Current v2 protocol and operating instructions: [DEPIN_IOT.md](DEPIN_IOT.md).
+The following describes legacy v1 compatibility.
+
 # IoT telemetry
 
 Telemetry envelopes contain `schema_version`, `device_id`, `home_id`, `sensor_type`, `sequence_number`, `measured_at`, and typed `data`. Supported sensors are smart meters, solar inverters, weather sensors, and battery monitors.

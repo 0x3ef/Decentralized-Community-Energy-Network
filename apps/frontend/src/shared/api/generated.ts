@@ -1,0 +1,278 @@
+// Generated from the checked-in FastAPI OpenAPI snapshot. npm run generate:api
+export type AllocationView = {
+  id: string;
+  batch_id: string;
+  producer_id: string;
+  consumer_id: string;
+  chain_allocation_id: string;
+  energy_wh: number;
+  due_wei: string;
+  status: string;
+  funding_status: string;
+  proof: Array<string>;
+};
+export type BatchView = {
+  id: string;
+  community_id: string;
+  chain_batch_id: string;
+  interval_start: string;
+  interval_end: string;
+  status: string;
+  root: string;
+  injection_wh: number;
+  consumption_wh: number;
+  allocated_wh: number;
+  unallocated_wh: number;
+  uncompensated_wh: number;
+  total_due_wei: string;
+  policy_id: string;
+};
+export type CalculateInterval = { interval_start: string };
+export type ClaimView = {
+  id: string;
+  batch_id: string;
+  kind: number;
+  chain_claim_id: string;
+  node_id: string;
+  meter_id: string;
+  chain_meter_id: string;
+  chain_node_id: string;
+  retirement_eligible: boolean;
+  energy_wh: number;
+  status: string;
+  proof: Array<string>;
+};
+export type CommunityCreate = {
+  allow_simulated_telemetry?: boolean;
+  boundary_description?: string;
+  topology?: string;
+  interval_seconds?: number;
+  name: string;
+  sun_per_kwh?: number | string;
+  loss_factor?: number | string;
+};
+export type CompensationCreate = {
+  injection_interval_id: string;
+  withdrawal_interval_id: string;
+  energy_wh: number;
+  idempotency_key: string;
+};
+export type CreditApprovalResult = {
+  id: string;
+  status: string;
+  message: string;
+};
+export type Deployment = {
+  chain_id: 31337 | 1337 | 11155111;
+  sun_address: string;
+  settlement_address: string;
+  vault_address: string;
+};
+export type DeploymentCreate = {
+  chain_id: number;
+  sun_address: string;
+  payment_address: string;
+  marketplace_address: string;
+  compensation_address: string;
+};
+export type DeviceCreateModel = {
+  home_id: string;
+  device_code: string;
+  device_type: string;
+  telemetry_source?: "PHYSICAL" | "SIMULATED";
+  manufacturer?: string | null;
+  model?: string | null;
+  serial_number?: string | null;
+  mqtt_client_id: string;
+};
+export type DeviceUpdateModel = { status?: string | null };
+export type EnergyCreditReadModel = {
+  id: string;
+  interval_id: string;
+  owner_id: string;
+  energy_wh: number;
+  token_amount: string;
+  status: string;
+  created_at: string;
+};
+export type EnergyIntervalReadModel = {
+  id: string;
+  home_id: string;
+  interval_start: string;
+  interval_end: string;
+  generation_wh: number;
+  consumption_wh: number;
+  grid_import_wh: number;
+  grid_export_wh: number;
+  battery_charge_wh: number;
+  battery_discharge_wh: number;
+  eligible_export_wh: number;
+  calculation_version: string;
+  quality_status: string;
+};
+export type EnergySummaryModel = {
+  home_id: string;
+  from_date: string;
+  to_date: string;
+  generation_wh: number;
+  consumption_wh: number;
+  grid_import_wh: number;
+  grid_export_wh: number;
+  eligible_export_wh: number;
+};
+export type FundingView = {
+  allocation_id: string;
+  status: string;
+  due_wei: string;
+  available_wei: string | null;
+  reserved_wei: string | null;
+  available_sun_units: string | null;
+  required_sun_units: string;
+  confirmed_block: number;
+};
+export type GovernancePrepare = {
+  salt?: string;
+  action:
+    | "apply_membership"
+    | "transition"
+    | "membership"
+    | "node"
+    | "meter"
+    | "price";
+  status?: number;
+  address?: string;
+  node_id?: string | null;
+  meter_id?: string | null;
+  active?: boolean;
+  price_wei_per_kwh?: string;
+};
+export type HTTPValidationError = { detail?: Array<ValidationError> };
+export type HomeCreateModel = {
+  name: string;
+  address: string;
+  city: string;
+  country?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  timezone?: string;
+  installed_capacity_w?: number;
+  has_battery?: boolean;
+};
+export type HomeUpdateModel = {
+  name?: string | null;
+  address?: string | null;
+  city?: string | null;
+  installed_capacity_w?: number | null;
+  has_battery?: boolean | null;
+  status?: string | null;
+};
+export type MemberCreate = { user_id: string; role?: string };
+export type MembershipUpdate = { status: string };
+export type MeterCreate = { device_id: string; credential: string };
+export type NodeCreate = { home_id: string };
+export type OrderBook = {
+  buy_orders: Array<OrderRead>;
+  sell_orders: Array<OrderRead>;
+};
+export type OrderCreate = {
+  order_type: string;
+  token_amount: number | string;
+  price_per_token: number | string;
+};
+export type OrderRead = {
+  id: string;
+  creator_id: string;
+  order_type: string;
+  token_amount: string;
+  price_per_token: string;
+  remaining_amount: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+export type ParticipantStatement = {
+  user_id: string;
+  asset: string;
+  available_wei: string;
+  reserved_wei: string;
+  claimable_wei: string;
+  settled_entitlement_wei: string;
+  withdrawn_earnings_wei: string;
+  unsettled_due_wei: string;
+  retired_wh: number;
+  block_number: number;
+};
+export type PasswordResetConfirmModel = {
+  new_password: string;
+  confirm_new_password: string;
+};
+export type PasswordResetRequestModel = { email: string };
+export type TradeRead = {
+  id: string;
+  order_id: string;
+  buyer_id: string;
+  seller_id: string;
+  token_amount: string;
+  execution_price: string;
+  status: string;
+  created_at: string;
+};
+export type Transaction = {
+  action:
+    | "deposit"
+    | "withdraw"
+    | "withdraw_earnings"
+    | "escrow_sun"
+    | "withdraw_sun"
+    | "approve_sun"
+    | "approve_retirement"
+    | "execute"
+    | "cancel"
+    | "retire";
+  amount_base_units?: string;
+  batch_id?: string;
+  claim_id?: string;
+  node_id?: string;
+  meter_id?: string;
+  proof?: Array<string>;
+};
+export type TransactionInput = { transaction_hash: string };
+export type TransactionReference = {
+  transaction_hash: string;
+  action:
+    | "deposit"
+    | "withdraw"
+    | "withdraw_earnings"
+    | "escrow_sun"
+    | "withdraw_sun"
+    | "retire"
+    | "approve_sun"
+    | "approve_retirement"
+    | "cancel";
+};
+export type UserCreateModel = {
+  first_name: string;
+  last_name: string;
+  username: string;
+  email: string;
+  password: string;
+};
+export type UserLoginModel = { email: string; password: string };
+export type UserMeModel = {
+  uid: string;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  created_at: string;
+  updated_at: string;
+};
+export type ValidationError = {
+  loc: Array<string | number>;
+  msg: string;
+  type: string;
+  input?: unknown;
+  ctx?: {};
+};
+export type WalletChallenge = { address: string };
+export type WalletProof = { address: string; nonce: string; signature: string };

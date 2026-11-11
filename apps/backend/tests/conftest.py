@@ -9,3 +9,6 @@ from src.core.db import dispose_engine
 async def close_database_pool():
     yield
     await dispose_engine()
+    from src.core.redis import token_blocklist
+
+    await token_blocklist.aclose()

@@ -6,4 +6,4 @@ if [ ! -f infrastructure/docker/.env ]; then
   python scripts/init_local_env.py
 fi
 docker compose -f infrastructure/docker/compose.prototype.yml up -d --build
-printf '%s\n' 'Stack started. Create a community through the API, deploy its contracts with scripts/deploy.sh COMMUNITY_UUID, then register the public deployment.'
+printf '%s\n' 'Stack started. See docs/NATIVE_ETH_PROTOCOL.md for governed community proposals and native ETH deployment.'

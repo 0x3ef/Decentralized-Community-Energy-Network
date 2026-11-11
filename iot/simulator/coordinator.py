@@ -33,8 +33,48 @@ class SimulationConfig:
     sequence_offset: int = 0
     random_seed: int | None = None
     checkpoint_path: str | None = None
+    telemetry_version: str = "2.0"
+    mode: str = "REALTIME"
+    speed: float = 1
+    start: datetime | None = None
+    fault: str = "none"
+    fault_device: str | None = None
 
     def __post_init__(self) -> None:
+        if self.fault not in (
+            "none",
+            "outage",
+            "device_outage",
+            "duplicate",
+            "packet_loss",
+            "out_of_order",
+            "counter_reset",
+            "clock_drift",
+            "invalid_payload",
+            "power_spike",
+            "export_spike",
+            "delay",
+            "mqtt_disconnection",
+            "unauthorized_device",
+            "missing_interval",
+        ):
+            raise ValueError("Unknown deterministic fault")
+        if self.speed <= 0:
+            raise ValueError("Simulation speed must be positive")
+        if self.mode not in (
+            "REALTIME",
+            "ACCELERATED",
+            "DETERMINISTIC",
+        ) or self.telemetry_version not in ("1.0", "2.0"):
+            raise ValueError("Invalid simulation mode or telemetry version")
+        if self.mode == "REALTIME" and (
+            self.speed != 1 or self.start is not None or self.fault != "none"
+        ):
+            raise ValueError("Acceleration and faults require explicit offline mode")
+        if self.mode != "REALTIME" and (
+            self.start is None or self.telemetry_version != "2.0"
+        ):
+            raise ValueError("Offline mode requires explicit start and v2 provenance")
         if self.interval_seconds <= 0:
             raise ValueError("interval_seconds must be greater than zero")
         if self.sequence_offset < 0:
@@ -64,9 +104,33 @@ class Simulator:
         self._config = config or SimulationConfig()
         self._sequence_numbers: dict[str, int] = {}
         self._sequence_offset = self._config.sequence_offset
+        from simulator.clock import DeterministicClock, SimulationClock
+
+        self._clock = (
+            DeterministicClock(
+                self._config.start, self._config.interval_seconds * self._config.speed
+            )
+            if self._config.mode == "DETERMINISTIC"
+            else SimulationClock(
+                self._config.start,
+                self._config.speed,
+                offline=self._config.mode != "REALTIME",
+            )
+        )
+        from uuid import NAMESPACE_URL, uuid4, uuid5
+
+        self._session_id = (
+            uuid5(
+                NAMESPACE_URL,
+                f"simulation:{self._config.random_seed}:{self._config.start}",
+            )
+            if self._config.mode == "DETERMINISTIC"
+            else uuid4()
+        )
         self._validate_configuration()
-        from simulator.physics import HomeEnergyModel
         import hashlib
+
+        from simulator.physics import HomeEnergyModel
 
         shared = {
             home.home_id: HomeEnergyModel(
@@ -82,6 +146,7 @@ class Simulator:
             for home in self._homes
         }
         self._pending: dict[str, dict] = {}
+        self._fault_delayed = {}
         self._energy_models = shared
         if self._config.checkpoint_path:
             from simulator.checkpoint import load
@@ -140,8 +205,8 @@ class Simulator:
             sequence=next_sequence,
         )
 
-        return {
-            "schema_version": "1.0",
+        message = {
+            "schema_version": self._config.telemetry_version,
             "home_id": home.home_id,
             "device_id": sensor.device_code,
             "sensor_type": sensor.sensor_type.value,
@@ -150,11 +215,35 @@ class Simulator:
             "data": data,
         }
 
+        if self._config.telemetry_version == "2.0":
+            from uuid import uuid5
+
+            from schemas.telemetry import measurement_unit
+
+            message.update(
+                message_id=str(
+                    uuid5(
+                        self._session_id,
+                        f"{sensor.device_code}:{next_sequence}:{measured_at.isoformat()}",
+                    )
+                ),
+                community_id="unregistered",
+                node_id=home.home_id,
+                source="SIMULATED",
+                simulation_mode=self._config.mode,
+                units={field: measurement_unit(field) for field in data},
+                quality=["VALID"],
+            )
+        return message
+
     def simulate_cycle(
         self, measured_at: datetime | None = None
     ) -> list[dict[str, Any]]:
         """Run one cycle over every active device."""
-        measured_at = measured_at or datetime.now(UTC)
+        measured_at = measured_at or self._clock.now()
+        if measured_at.tzinfo is None:
+            raise ValueError("Simulation timestamps must be timezone-aware")
+        measured_at = measured_at.astimezone(UTC)
         messages: list[dict[str, Any]] = []
 
         for home in self._homes:
@@ -174,12 +263,36 @@ class Simulator:
                     if message is None:
                         continue
 
+                    from simulator.faults import inject
+
+                    fault = (
+                        self._config.fault
+                        if self._config.fault_device in (None, sensor.device_code)
+                        else "none"
+                    )
+                    if fault == "out_of_order":
+                        old = self._fault_delayed.pop(sensor.device_code, None)
+                        if old is None:
+                            self._fault_delayed[sensor.device_code] = message
+                            continue
+                        emitted = [message, old]
+                    else:
+                        emitted = inject([message], fault)
+                    if fault == "mqtt_disconnection":
+                        raise ConnectionError("Injected MQTT disconnect")
+                    if not emitted:
+                        continue
+                    message = emitted[0]
                     if self._publisher is not None:
                         self._pending[sensor.device_code] = message
                         self._publisher.publish(sensor.get_mqtt_topic(), message)
                         del self._pending[sensor.device_code]
 
                     messages.append(message)
+                    for duplicate in emitted[1:]:
+                        if self._publisher is not None:
+                            self._publisher.publish(sensor.get_mqtt_topic(), duplicate)
+                        messages.append(duplicate)
                     logger.info(
                         "Generated telemetry: home=%s device=%s seq=%d",
                         home.home_id,

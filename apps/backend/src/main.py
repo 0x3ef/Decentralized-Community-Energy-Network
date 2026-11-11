@@ -64,3 +64,12 @@ from sqlalchemy.exc import IntegrityError
 @app.exception_handler(IntegrityError)
 async def integrity_conflict(request: Request, exc: IntegrityError):
     return JSONResponse(status_code=409, content={"detail": "Operation conflicts with an existing record or accounting constraint"})
+
+from src.modules.community.native_routes import router as native_router
+app.include_router(native_router,prefix=f"{version_prefix}/communities",tags=['native ETH settlement'])
+
+from src.modules.settlement.routes import router as settlement_router
+app.include_router(settlement_router,prefix=f"{version_prefix}/communities",tags=["native interval settlement"])
+
+from src.iot.routes import router as telemetry_router
+app.include_router(telemetry_router,prefix=f"{version_prefix}/iot",tags=["telemetry quality"])

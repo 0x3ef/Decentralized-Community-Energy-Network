@@ -27,6 +27,7 @@ from sqlmodel import Field, Relationship, SQLModel
 if TYPE_CHECKING:
     from src.modules.home.models import Home
 
+
 class Device(SQLModel, table=True):
     __tablename__ = "devices"
 
@@ -60,9 +61,10 @@ class Device(SQLModel, table=True):
 
     device_code: Optional[str] = Field(default=None, max_length=100, unique=True)
 
-    device_type: str = Field(
-        sa_column=Column(String(30), nullable=False)
-    )
+    device_type: str = Field(sa_column=Column(String(30), nullable=False))
+
+    telemetry_source: str = Field(default="PHYSICAL", max_length=20)
+    counter_modulus_wh: int | None = Field(default=None, sa_type=BigInteger)
 
     manufacturer: Optional[str] = Field(
         default=None,
@@ -177,10 +179,12 @@ class DeviceCredential(SQLModel, table=True):
 # TELEMETRY
 # ============================================================
 
+
 class TelemetryMessage(SQLModel, table=True):
     __tablename__ = "telemetry_messages"
 
     __table_args__ = (
+        UniqueConstraint("device_id", "message_id", name="uq_telemetry_device_message"),
         UniqueConstraint(
             "device_id",
             "sequence_number",
@@ -208,9 +212,9 @@ class TelemetryMessage(SQLModel, table=True):
         index=True,
     )
 
-    sequence_number: int = Field(
-        sa_column=Column(BigInteger, nullable=False)
-    )
+    message_id: uuid.UUID | None = Field(default=None)
+
+    sequence_number: int = Field(sa_column=Column(BigInteger, nullable=False))
 
     schema_version: str = Field(
         default="1",
@@ -232,9 +236,7 @@ class TelemetryMessage(SQLModel, table=True):
         sa_column=Column(String(255)),
     )
 
-    payload: dict[str, Any] = Field(
-        sa_column=Column(JSONB, nullable=False)
-    )
+    payload: dict[str, Any] = Field(sa_column=Column(JSONB, nullable=False))
 
     quality_status: str = Field(
         default="RECEIVED",
@@ -250,6 +252,7 @@ class TelemetryMessage(SQLModel, table=True):
 # ============================================================
 # SMART METER
 # ============================================================
+
 
 class SmartMeter(SQLModel, table=True):
     __tablename__ = "smart_meter"
@@ -283,6 +286,10 @@ class SmartMeter(SQLModel, table=True):
     active_power_w: Optional[Decimal] = Field(
         default=None,
         sa_column=Column(Numeric(12, 3)),
+    )
+
+    consumption_power_w: Decimal | None = Field(
+        default=None, sa_column=Column(Numeric(12, 3))
     )
 
     power_factor: Optional[Decimal] = Field(
@@ -319,6 +326,7 @@ class SmartMeter(SQLModel, table=True):
 # ============================================================
 # INVERTER
 # ============================================================
+
 
 class Inverter(SQLModel, table=True):
     __tablename__ = "inverter"
@@ -379,6 +387,7 @@ class Inverter(SQLModel, table=True):
 # WEATHER
 # ============================================================
 
+
 class WeatherSensor(SQLModel, table=True):
     __tablename__ = "weather"
 
@@ -423,6 +432,7 @@ class WeatherSensor(SQLModel, table=True):
 # BATTERY
 # ============================================================
 
+
 class BatteryMonitor(SQLModel, table=True):
     __tablename__ = "battery"
 
@@ -436,6 +446,10 @@ class BatteryMonitor(SQLModel, table=True):
         nullable=False,
         unique=True,
     )
+
+    cumulative_charge_wh: int | None = Field(default=None, sa_type=BigInteger)
+    cumulative_discharge_wh: int | None = Field(default=None, sa_type=BigInteger)
+    capacity_wh: int | None = Field(default=None, sa_type=BigInteger)
 
     state_of_charge_pct: Optional[Decimal] = Field(
         default=None,
@@ -482,6 +496,7 @@ class BatteryMonitor(SQLModel, table=True):
 # DEVICE COUNTER SNAPSHOTS
 # ============================================================
 
+
 class DeviceCounterSnapshot(SQLModel, table=True):
     __tablename__ = "device_counter_snapshots"
 
@@ -504,13 +519,9 @@ class DeviceCounterSnapshot(SQLModel, table=True):
         index=True,
     )
 
-    counter_name: str = Field(
-        sa_column=Column(String(80), nullable=False)
-    )
+    counter_name: str = Field(sa_column=Column(String(80), nullable=False))
 
-    counter_value_wh: int = Field(
-        sa_column=Column(BigInteger, nullable=False)
-    )
+    counter_value_wh: int = Field(sa_column=Column(BigInteger, nullable=False))
 
     measured_at: datetime = Field(
         sa_column=Column(DateTime(timezone=True), nullable=False)
@@ -522,3 +533,27 @@ class DeviceCounterSnapshot(SQLModel, table=True):
         nullable=False,
     )
 
+
+class TelemetryAssessment(SQLModel, table=True):
+    """Safe audit of accepted and rejected evidence, with counted repeated delivery."""
+
+    __tablename__ = "telemetry_assessments"
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    fingerprint: str = Field(unique=True, max_length=64)
+    device_id: uuid.UUID | None = Field(
+        default=None, foreign_key="devices.id", index=True
+    )
+    claimed_device_id: str = Field(default="", max_length=100)
+    sequence_number: int | None = Field(default=None, sa_type=BigInteger)
+    payload_hash: str = Field(max_length=64)
+    state: str = Field(max_length=30, index=True)
+    reason: str = Field(max_length=300)
+    occurrences: int = 1
+    first_seen: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+    )
+    last_seen: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=DateTime(timezone=True),
+    )

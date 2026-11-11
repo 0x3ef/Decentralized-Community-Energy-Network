@@ -19,8 +19,22 @@ class EnergyCommunity(SQLModel, table=True):
             "sun_per_kwh > 0 AND loss_factor >= 0 AND loss_factor < 1",
             name="ck_community_policy",
         ),
+        CheckConstraint(
+            "status IN ('DRAFT','PROPOSED','UNDER_REVIEW','APPROVED','ACTIVE','SUSPENDED','REJECTED','ARCHIVED') AND interval_seconds > 0",
+            name="ck_community_lifecycle",
+        ),
     )
     id: UUID = Field(default_factory=uuid4, primary_key=True)
+    status: str = Field(default="DRAFT", max_length=20)
+    proposer_id: UUID | None = Field(default=None, foreign_key="users.uid")
+    allow_simulated_telemetry: bool = False
+    boundary_description: str = Field(default="", max_length=1000)
+    topology: str = Field(default="SIMULATED_GRID_CONNECTED", max_length=50)
+    policy_hash: str = Field(default="", max_length=66)
+    boundary_hash: str = Field(default="", max_length=66)
+    interval_seconds: int = Field(default=900)
+    registry_address: str | None = Field(default=None, max_length=42)
+    governance_transaction: str | None = Field(default=None, max_length=66)
     name: str = Field(max_length=150)
     sun_per_kwh: Decimal = Field(
         default=Decimal(1), sa_column=Column(Numeric(24, 8), nullable=False)
@@ -37,7 +51,7 @@ class CommunityMembership(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint("community_id", "user_id"),
         CheckConstraint(
-            "role IN ('member','operator') AND status IN ('ACTIVE','SUSPENDED')",
+            "role IN ('member','operator') AND status IN ('PENDING','APPROVED','ACTIVE','SUSPENDED','REVOKED')",
             name="ck_membership",
         ),
     )
@@ -178,3 +192,12 @@ class ChainSyncState(SQLModel, table=True):
     community_id: UUID = Field(foreign_key="energy_communities.id", primary_key=True)
     block_number: int = -1
     block_hash: str | None = Field(default=None, max_length=66)
+
+
+class NativeDeployment(SQLModel, table=True):
+    __tablename__ = "community_native_deployments"
+    community_id: UUID = Field(foreign_key="energy_communities.id", primary_key=True)
+    chain_id: int
+    sun_address: str = Field(max_length=42)
+    settlement_address: str = Field(max_length=42, unique=True)
+    vault_address: str = Field(max_length=42, unique=True)

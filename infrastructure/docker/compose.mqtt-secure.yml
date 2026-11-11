@@ -1,0 +1,18 @@
+# Overlay compose.prototype.yml after provisioning broker users, ACLs and TLS.
+services:
+  mosquitto:
+    volumes:
+      - ./mosquitto/secure/mosquitto-tls.conf:/mosquitto/config/mosquitto.conf:ro
+      - ${MQTT_PASSWORD_FILE:?Set a Mosquitto password file}:/run/mqtt/passwords:ro
+      - ${MQTT_ACL_FILE:?Set generated exact topic ACLs}:/run/mqtt/acl:ro
+      - ${MQTT_TLS_DIRECTORY:?Set the TLS certificate directory}:/run/mqtt/tls:ro
+    ports:
+      - "127.0.0.1:8883:8883"
+  subscriber:
+    environment:
+      MQTT_PORT: 8883
+      MQTT_USERNAME: solar-subscriber
+      MQTT_PASSWORD: ${MQTT_SUBSCRIBER_PASSWORD:?Set the subscriber broker password}
+      MQTT_TLS_CA: /run/mqtt/ca.crt
+    volumes:
+      - ${MQTT_TLS_DIRECTORY:?Set the TLS certificate directory}/ca.crt:/run/mqtt/ca.crt:ro
