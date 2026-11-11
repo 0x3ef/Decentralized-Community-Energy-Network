@@ -52,3 +52,7 @@ def gateway_address() -> str:
     if not _port_open(host, int(port)):
         pytest.skip(f"Gateway not reachable at {addr}")
     return addr
+
+@pytest.fixture(scope="session")
+def mqtt_port() -> int:
+    return int(os.getenv("MQTT_PORT", "1883"))

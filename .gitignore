@@ -54,3 +54,8 @@ apps/frontend/playwright-report/
 
 # Local simulator checkpoints
 iot/state/
+
+# Private protocol bootstrap journals, device bindings and outputs
+.run/
+
+!**/.env.sepolia.example

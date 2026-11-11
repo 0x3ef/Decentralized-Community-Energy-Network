@@ -34,6 +34,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Config
+from src.core.observability import heartbeat, configure_logging
 from src.core.db import AsyncSessionFactory, dispose_engine
 from src.iot.quality import assess, source_error
 from src.iot.telemetry_validator import Envelope, validate_envelope
@@ -61,6 +62,8 @@ class MqttIngestWorker:
         self._loop = asyncio.get_running_loop()
         self._stop = asyncio.Event()
         self._overflowed = False
+        self._persistence_ok = True
+        self._metrics = {"persisted":0,"duplicates":0,"rejected":0}
         self._session_factory = AsyncSessionFactory
 
         self._client = mqtt.Client(
@@ -204,6 +207,10 @@ class MqttIngestWorker:
                 async with self._session_factory() as session:
                     inserted, skipped = await _insert_batch(session, batch)
                     await session.commit()
+                self._persistence_ok = True
+                self._metrics["persisted"] += inserted
+                self._metrics["duplicates"] += skipped
+                self._metrics["rejected"] += len(batch)-inserted-skipped
                 for payload in batch:
                     if payload.pop("_mqtt_slot", False):
                         self._slots.release()
@@ -228,6 +235,7 @@ class MqttIngestWorker:
                 )
                 return
             except Exception:
+                self._persistence_ok = False
                 logger.exception("Database batch failed; retrying in %s seconds", delay)
                 await asyncio.sleep(delay)
                 delay = min(delay * 2, 30)
@@ -263,10 +271,18 @@ class MqttIngestWorker:
         self._client.loop_start()
 
         drain_task = asyncio.create_task(self._drain_loop())
+        async def report_health():
+            while not self._stop.is_set():
+                await heartbeat('subscriber',self._client.is_connected() and self._persistence_ok and not drain_task.done(),queue_depth=self._queue.qsize(),**self._metrics)
+                try: await asyncio.wait_for(self._stop.wait(),timeout=5)
+                except TimeoutError: pass
+        health_task=asyncio.create_task(report_health())
 
         try:
             await self._stop.wait()
         finally:
+            health_task.cancel()
+            with suppress(asyncio.CancelledError): await health_task
             drain_task.cancel()
             with suppress(asyncio.CancelledError):
                 await drain_task
@@ -592,6 +608,7 @@ async def _main() -> None:
 
 def main() -> None:
     """Blocking entry point used by ``python -m app.iot``."""
+    configure_logging()
     asyncio.run(_main())
 
 

@@ -12,3 +12,8 @@
 contracts/lib
 contracts/out
 contracts/cache
+
+**/.env.*
+!**/.env.example
+**/e2e/.native-fixture.json
+.run

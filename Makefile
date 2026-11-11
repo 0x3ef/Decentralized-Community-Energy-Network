@@ -3,7 +3,7 @@
 ROOT_DIR     := $(shell pwd)
 DEV_TOOLS ?= $(ROOT_DIR)/.dev-tools
 COMPOSE_FILE := $(ROOT_DIR)/infrastructure/docker/compose.prototype.yml
-COMPOSE      := docker compose -f $(COMPOSE_FILE)
+COMPOSE      := docker compose --env-file $(ROOT_DIR)/infrastructure/docker/.env -f $(COMPOSE_FILE)
 
 .PHONY: help setup up down logs ps build migrate seed test test-contracts test-iot \
         test-backend lint format typecheck contracts-deploy clean
@@ -30,13 +30,13 @@ ps: ## Show container status
 build: ## Build all Docker images
 	$(COMPOSE) build
 
-seed: ## Load SQL seeds into the running DB
+seed: ## Load ungoverned SQLModel fixtures into the running DB
 	./scripts/seed_db.sh
 
 migrate: ## Apply Alembic migrations to the running DB
 	$(COMPOSE) run --rm migrate
 
-test: test-contracts test-backend test-iot ## Run contract, backend and IoT verification
+test: test-contracts test-backend test-iot test-frontend ## Run contract, backend and IoT verification
 
 test-contracts: ## Run Foundry tests
 	$(DEV_TOOLS)/node_modules/.bin/forge test --root contracts --use $(DEV_TOOLS)/solc-0.8.24
@@ -59,8 +59,27 @@ typecheck: ## Run mypy on backend and iot
 	cd apps/backend && mypy .
 	cd iot && mypy .
 
-contracts-deploy: ## Deploy contracts to the running Anvil
-	@echo "Run scripts/deploy.sh COMMUNITY_UUID for a registered community"
+contracts-build: ## Compile reviewed contract artifacts
+	$(DEV_TOOLS)/node_modules/.bin/forge build --root contracts --use $(DEV_TOOLS)/solc-0.8.24
+
+demo: ## Commission deterministic governed local users, nodes and meters
+	python scripts/init_local_env.py
+	python scripts/bootstrap_demo.py
+
+demo-scenario: ## Verify actual MQTT, automatic settlement, SUN retirement and earnings withdrawal
+	PYTHONPATH=apps/backend python scripts/demo_scenario.py
+
+simulate: ## Start the registered REALTIME MQTT simulator for the governed demo
+	$(COMPOSE) --env-file $(ROOT_DIR)/.run/demo/compose.env -f infrastructure/docker/compose.iot.yml --profile simulation up -d --build simulator
+
+contracts-deploy: ## Run native Sepolia preflight; broadcasting is always explicit
+	@echo "scripts/deploy.sh COMMUNITY_UUID --network sepolia [--broadcast]"
+
+test-frontend: ## Verify strict frontend types, lint, tests and production build
+	cd apps/frontend && npm run typecheck && npm run lint && npm test && npm run build
+
+test-browser: ## Start a fresh native fixture and run all real API browser journeys
+	cd apps/frontend && npm run test:e2e:all
 
 clean: ## Stop the stack and delete volumes + build artifacts
 	$(COMPOSE) down -v

@@ -2,8 +2,6 @@
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
-if [ ! -f infrastructure/docker/.env ]; then
-  python scripts/init_local_env.py
-fi
-docker compose -f infrastructure/docker/compose.prototype.yml up -d --build
+python scripts/init_local_env.py
+docker compose --env-file infrastructure/docker/.env -f infrastructure/docker/compose.prototype.yml up -d --build --wait --wait-timeout 180
 printf '%s\n' 'Stack started. See docs/NATIVE_ETH_PROTOCOL.md for governed community proposals and native ETH deployment.'

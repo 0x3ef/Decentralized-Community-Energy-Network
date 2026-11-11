@@ -1,6 +1,12 @@
 # Overlay compose.prototype.yml after provisioning broker users, ACLs and TLS.
 services:
   mosquitto:
+    # Subscriber heartbeat verifies actual authenticated MQTT connectivity.
+    healthcheck:
+      test: [CMD-SHELL, "pidof mosquitto >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
     volumes:
       - ./mosquitto/secure/mosquitto-tls.conf:/mosquitto/config/mosquitto.conf:ro
       - ${MQTT_PASSWORD_FILE:?Set a Mosquitto password file}:/run/mqtt/passwords:ro

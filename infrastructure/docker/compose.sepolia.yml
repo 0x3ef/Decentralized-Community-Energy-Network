@@ -1,0 +1,26 @@
+# Overlay with compose.prototype.yml and --env-file .env.sepolia.
+# The local Anvil dependency remains isolated/unused; RPC chain checks must report Sepolia.
+services:
+  api:
+    environment: &sepolia
+      ENVIRONMENT: testnet
+      CHAIN_ID: '11155111'
+      WEB3_PROVIDER_URL: ${SEPOLIA_RPC_URL:?Configure an authorized Sepolia RPC securely}
+      COMMUNITY_REGISTRY_ADDRESS: ${COMMUNITY_REGISTRY_ADDRESS:?Supply the confirmed Sepolia registry}
+      GOVERNANCE_TIMELOCK_ADDRESS: ${GOVERNANCE_TIMELOCK_ADDRESS:?Supply the confirmed Sepolia timelock}
+      BACKEND_PRIVATE_KEY: ${BACKEND_PRIVATE_KEY:?Supply the distinct authorized oracle signer}
+      BLOCKCHAIN_CONFIRMATION_BLOCKS: '3'
+      NATIVE_SETTLEMENT_START_BLOCK: ${NATIVE_SETTLEMENT_START_BLOCK:?Set the earliest deployment block}
+      SEED_PASSWORD: ''
+      SEED_DEVICE_KEY: ''
+  worker:
+    environment: *sepolia
+  subscriber:
+    environment: *sepolia
+  frontend:
+    build:
+      args:
+        VITE_CHAIN_ID: '11155111'
+        VITE_REGISTRY_ADDRESS: ${COMMUNITY_REGISTRY_ADDRESS}
+        VITE_TIMELOCK_ADDRESS: ${GOVERNANCE_TIMELOCK_ADDRESS}
+        VITE_SEPOLIA_RPC_URL: ${VITE_SEPOLIA_RPC_URL:-}

@@ -45,7 +45,7 @@ def test_gateway_connection_timeout_resets_channel(monkeypatch):
 
 
 @pytest.mark.integration
-def test_mqtt_publisher_validated_delivery_and_close(mqtt_host):
+def test_mqtt_publisher_validated_delivery_and_close(mqtt_host,mqtt_port):
     inbox = queue.Queue()
     subscriber = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     subscriber.on_message = lambda client, userdata, message: inbox.put(
@@ -55,11 +55,11 @@ def test_mqtt_publisher_validated_delivery_and_close(mqtt_host):
 
     ready = threading.Event()
     subscriber.on_subscribe = lambda *args: ready.set()
-    subscriber.connect(mqtt_host, 1883)
+    subscriber.connect(mqtt_host, mqtt_port)
     subscriber.subscribe("solar/TEST-TRANSPORT/#", qos=1)
     subscriber.loop_start()
     assert ready.wait(5)
-    publisher = MqttPublisher(mqtt_host, client_id="transport-lifecycle")
+    publisher = MqttPublisher(mqtt_host,mqtt_port,client_id="transport-lifecycle")
     try:
         payload = {
             "schema_version": "1.0",

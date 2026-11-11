@@ -73,3 +73,7 @@ app.include_router(settlement_router,prefix=f"{version_prefix}/communities",tags
 
 from src.iot.routes import router as telemetry_router
 app.include_router(telemetry_router,prefix=f"{version_prefix}/iot",tags=["telemetry quality"])
+
+from src.core.observability import router as operations_router, ready_response
+app.include_router(operations_router,prefix=version_prefix,tags=['operations'])
+app.add_api_route('/ready',ready_response,methods=['GET'],include_in_schema=False)

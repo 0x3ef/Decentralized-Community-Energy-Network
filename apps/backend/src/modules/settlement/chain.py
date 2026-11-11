@@ -162,6 +162,12 @@ class NativeSettlementChain(CommunityChain):
                         op = await self.sign_operation(
                             session, job, function, deployment.chain_id
                         )
+                    if not self.operation_network_matches(op):
+                        op.status = "BLOCKED"
+                        job.status = "FAILED"
+                        job.last_error = "Unverified chain identity; inspect receipts and explicitly retry only on the intended chain"
+                        job.locked_at = None
+                        continue
                     job.status = "PROCESSING"
                     job.locked_at = datetime.now(UTC)
                     await session.flush()

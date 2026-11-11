@@ -166,20 +166,35 @@ class CommunityChain:
             raise ValueError("Unsupported community outbox operation")
         return await self.sign_operation(session, event, function, deployment.chain_id)
 
+    def chain_identity(self):
+        return Web3.to_hex(self.web3.eth.get_block(0).hash)
+
+    def operation_network_matches(self, operation):
+        return (
+            operation.chain_id == self.web3.eth.chain_id
+            and operation.chain_genesis == self.chain_identity()
+        )
+
     async def sign_operation(self, session, event, function, chain_id):
         """Shared signer/nonce journal for legacy and native protocol workers."""
         account = self.web3.eth.account.from_key(Config.BACKEND_PRIVATE_KEY)
+        genesis = self.chain_identity()
+        if self.web3.eth.chain_id != chain_id:
+            raise ValueError("RPC chain mismatch")
         # PostgreSQL transaction lock coordinates every worker sharing the signer.
         lock = int.from_bytes(
-            Web3.keccak(text=f"{chain_id}:{account.address}")[:8],
+            Web3.keccak(text=f"{chain_id}:{genesis}:{account.address}")[:8],
             "big",
             signed=True,
         )
-        await session.exec(text("SELECT pg_advisory_xact_lock(:key)"), params={"key": lock})
+        await session.exec(
+            text("SELECT pg_advisory_xact_lock(:key)"), params={"key": lock}
+        )
         maximum = (
             await session.exec(
                 select(func.max(ChainOperation.nonce)).where(
                     ChainOperation.chain_id == chain_id,
+                    ChainOperation.chain_genesis == genesis,
                     ChainOperation.sender == account.address,
                 )
             )
@@ -209,6 +224,7 @@ class CommunityChain:
         operation = ChainOperation(
             outbox_id=event.id,
             chain_id=chain_id,
+            chain_genesis=genesis,
             sender=account.address,
             nonce=nonce,
             transaction_hash=Web3.to_hex(signed.hash),
@@ -252,6 +268,11 @@ class CommunityChain:
                         if event.status == "PROCESSED":
                             continue
                         operation = await self.prepare(session, event)
+                        if not self.operation_network_matches(operation):
+                            operation.status = "BLOCKED"
+                            event.status = "FAILED"
+                            event.last_error = "Unverified chain identity; explicit reconciliation required"
+                            continue
                         event.status = "PROCESSING"
                         await session.flush()
                         tx_hash, raw = (
@@ -776,6 +797,10 @@ class CommunityChain:
                 .with_for_update()
             )
         ).one()
+        if not self.operation_network_matches(operation):
+            raise ValueError(
+                "Operation chain identity is unverified; do not replace or rebroadcast it"
+            )
         if operation.status != "PREPARED":
             raise ValueError("Only an unconfirmed pending operation may be replaced")
         transaction = self.web3.eth.get_transaction(operation.transaction_hash)
