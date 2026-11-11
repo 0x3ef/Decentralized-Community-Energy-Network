@@ -1,14 +1,14 @@
-# Automated community settlement backend
+# Community energy allocation and settlement
 
-The FastAPI backend now constructs native ETH batches and drives the Prompt 1
-contracts through the existing community worker. Historical ERC20 deployments,
+The FastAPI backend constructs native ETH batches and drives the governed
+contracts through the community worker. Historical ERC20 deployments,
 payments and denominations remain separate. No historical obligation is relabelled
 as ETH and no legacy marketplace payment is created by this pipeline.
 
 ## Operating sequence
 
 1. Deploy and approve the native protocol as described in
-   [NATIVE_ETH_PROTOCOL.md](NATIVE_ETH_PROTOCOL.md). Verify the registry's protocol
+   [blockchain protocol](blockchain.md). Verify the registry's protocol
    binding, fixed wei/kWh price, operator, active members, nodes and meter bindings.
 2. Authenticate device telemetry with registered credentials. The energy worker
    differences cumulative counters, rejects duplicates/resets/spikes and finalizes
@@ -84,7 +84,7 @@ requires explicit archival rather than automatic table deletion.
 
 A calculation and its outbox job commit together. Before any broadcast, workers
 commit the raw signed transaction, hash, nonce and job lease. All legacy and native
-service transactions share the same PostgreSQL signer/chain nonce lock and journal.
+service transactions share a PostgreSQL chain-ID/genesis/signer nonce lock and journal.
 A crash before/after broadcast reuses the same signed bytes. Leases expire after
 30 seconds; transient errors use bounded exponential retry. An operator can inspect
 job errors. A confirmed reverted transaction is terminal FAILED and requires an
@@ -102,65 +102,52 @@ were orphaned replay their journalled transaction, not a new entitlement. User
 transactions require the user's own retry; the worker never signs for them.
 Reconciliation aborts if the canonical chain changes during its pass.
 
-## APIs
+## Participant and operator interfaces
 
-All paths below are under `/api/v1/communities`. JWT authentication is required.
-Current community/member authority is checked against the registry. Personal
-allocations and claims are restricted to the requesting participant; funding
-responses disclose only that participant's own vault/escrow balances. Aggregate
-batch totals are visible to authorized community members. Oracle job errors and
-retry actions require the appointed operator. Raw signed bytes are never returned.
-List endpoints use bounded `limit` and `offset`; history also supports `status`.
+The [API guide](api.md) owns the route reference. Participants can read their own
+claims, allocations, funding and statement; operators can calculate, inspect jobs,
+reconcile and explicitly retry terminal failed work. Unsigned native preparation
+supports deposits, withdrawals, SUN escrow, retirement and reservation cancellation.
+Governance preparation returns registry schedule/execute calls, not an automatic
+batch finalization. Full participant evidence manifests and batch-finalization
+preparation remain incomplete.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| POST | `/{id}/settlements/calculate` | Operator calculates an aligned `interval_start` |
-| GET | `/{id}/settlements` | Batch overview and history |
-| GET | `/{id}/settlements/{batch}` | Interval totals, unallocated injection and obligations |
-| GET | `/{id}/settlements/{batch}/allocations` | Own pair obligations and funding/settlement states |
-| GET | `/{id}/settlements/{batch}/claims?kind=1` | Own compensation eligibility/history and exact claim proofs |
-| GET | `/{id}/allocations/{allocation}/funding` | Funding/escrow preflight and confirmed own balances |
-| GET | `/{id}/settlement-statement` | Own dues, settled entitlements, claimable and withdrawn earnings, retirement |
-| GET | `/{id}/settlement-policy` | Governed price and immutable policy rules |
-| GET | `/{id}/settlements/{batch}/operations` | Operator's durable job/transaction status |
-| POST | `/{id}/settlements/{batch}/reconcile` | Operator requests canonical event reconciliation |
-| POST | `/{id}/settlements/{batch}/jobs/{job}/retry` | Explicitly retry a terminal FAILED operation |
-| POST | `/{id}/native/transactions` | Track own hash and declared action after function/sender/target validation |
-| GET | `/{id}/native/transactions` | Own pending/confirmed/failed/reorganization status |
-| POST | `/{id}/memberships/apply` | PENDING local membership application, grants no authority |
-| POST | `/{id}/memberships/sync` | Synchronize own membership from confirmed registry state |
-| POST | `/{id}/governance/prepare` | Unsigned review, approval, activation, suspension, membership, node, meter or price calldata |
+## Worked and executed local scenario
 
-The existing native wallet read/prepare endpoints still handle explicit deposits,
-withdrawals, SUN approval/escrow, retirement and consumer cancellation of an
-expired or suspended reservation (`cancel` with its claim_id). Native wallet balances now include
-the confirmed block number. Claim responses include chain_node_id and chain_meter_id
-in bytes32 form for the retirement request. A `retirement_eligible` claim indicates
-funded SUN delivery; the user must still own the credits and approve the burn.
+At 5,000 Wh eligible injection and 3,000 Wh eligible demand, allocation is 3,000 Wh
+and unallocated injection is 2,000 Wh. With approved price 10^15 wei/kWh:
 
-Governance preparation checks the registrar or the configured timelock's proposer
-role. With a timelock it returns separate unsigned schedule/execute calldata,
-operation ID and minimum delay. A supplied salt makes preparation repeatable.
-Scheduling is not execution, and execution is not a database authority update until
-the existing governance receipt synchronization verifies canonical confirmations.
-Detailed node/meter physical verification remains the registrar's responsibility.
+```text
+due_wei = ceil(3000 * 10^15 / 1000) = 3 * 10^15 = 0.003 test ETH
+```
 
-## Configuration and verification
+After governance finalization, the injection claim issues 5 SUN. The producer
+approves and escrows those credits. A consumer deposit of 0.01 ETH funds the
+0.003 ETH reservation. Execution delivers 3 SUN and credits 0.003 ETH producer
+earnings, leaving 0.007 ETH consumer available funds and 2 SUN producer escrow.
+The consumer separately approves and retires 3 SUN; supply becomes 2 SUN and no
+second ETH payment occurs. The producer withdraws the 0.003 ETH earnings.
 
-- `NATIVE_SETTLEMENT_ENABLED=true`: enable the native stage in community_worker.
-- `NATIVE_SETTLEMENT_LOOKBACK_HOURS=24`: bounded automatic discovery (1–168 hours).
-- `NATIVE_SETTLEMENT_INTERVAL_LIMIT=200`: per-community scan limit; explicit API
-  calculation can backfill older intervals.
-- `NATIVE_SETTLEMENT_START_BLOCK=0`: initial event scan bound. On Sepolia, set this
-  to the earliest relevant deployment block to avoid scanning the entire chain.
-- `GOVERNANCE_TIMELOCK_ADDRESS`: approved timelock for governance preparation.
-- Existing RPC, confirmation-depth, registry and service signer settings still
-  apply. The signer needs oracle/settlement authority and test ETH for gas.
-  No user private key is requested or stored.
+This complete scenario was executed locally, including a worker restart and
+idempotent replay; see [verification](verification.md) and the retained
+[local evidence](evidence/local-native-scenario.json). It is not a public testnet
+transaction or a physical-energy delivery assertion.
 
-Run `scripts/test_backend.sh -q`, `make test-contracts`, and `scripts/test_iot.sh -q`
-using the installed development environment. The integration test deploys real
-contracts and exercises authenticated counter differencing, exact obligations,
-concurrent calculation, crash recovery, underfunding, escrow, delivery, replay,
-retirement, withdrawals, timelock preparation and an Anvil snapshot reorganization.
-No public Sepolia broadcast or independent security audit is implied.
+## Status and correction boundaries
+
+A batch starts PREPARED; contract submission is CHALLENGEABLE, then governance
+may finalize or reject it. Finalized evidence is distinct from an allocation's
+funding state (such as UNFUNDED or SUN_UNAVAILABLE), reservation, and SETTLED
+delivery. SQL statuses are projections of these stages rather than a single
+"paid" flag. A retirement claim becomes RETIRED only after confirmed burning.
+
+Community suspension prevents new issuance and settlement while preserving safe
+exits. Consumers can cancel reservations on suspension or expiry; they cannot
+withdraw reserved funds directly. Used batch corrections and paid entitlement
+reversals require explicit review; there is no automatic correction endpoint.
+Contradictory authenticated evidence quarantines intervals and blocks new worker
+operations. Existing chain payments remain actual history.
+
+Worker configuration defaults and source settings are centralized in
+[configuration](configuration.md); signing and canonical recovery are in
+[blockchain](blockchain.md).

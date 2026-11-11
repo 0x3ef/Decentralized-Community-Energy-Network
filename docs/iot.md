@@ -1,4 +1,4 @@
-# Community-aware IoT and verified interval inputs
+# IoT metering, simulation and verification
 
 The current path is simulation/physical device → authenticated MQTT → versioned
 schema → persisted evidence → counter processing → interval verification → governed
@@ -160,7 +160,7 @@ Authenticated reads (own device only):
 
 Settlement batches retain source/schema/mode references as well as interval, node,
 meter, telemetry IDs and hashes. Finalized governance and financial conditions are
-still required after an interval becomes ready; see [AUTOMATED_SETTLEMENT.md](AUTOMATED_SETTLEMENT.md).
+still required after an interval becomes ready; see [community settlement](community-settlement.md).
 
 ## Broker ACLs and TLS
 
@@ -191,3 +191,57 @@ silently disabled to make a connection succeed.
 The automated security test starts a disposable real TLS Mosquitto broker, verifies
 accepted scoped delivery, rejects a cross-community MQTT v5 publish and rejects
 anonymous access. No public broker, production identity or external device is used.
+
+## Provisioning sequence and payload example
+
+1. Create an owned home and pending device through the authenticated API.
+2. Propose the community with its physical boundary and source policy; governance
+   reviews, approves, configures its price and activates an appointed operator.
+3. Verify the owner's wallet and synchronize approved registry membership.
+4. Register the physical node, authorize its public meter UUID through governance,
+   and synchronize the node owner.
+5. An operator binds the internal device UUID to that node with a fresh 32+ character
+   credential through `POST /api/v1/communities/nodes/{node_id}/meters`.
+6. Configure the device's exact topic, credential and independent broker ACL.
+
+This illustrative v2 body follows the
+[backend validator](../apps/backend/src/iot/telemetry_validator.py). UUIDs must be
+replaced with commissioned identities; the timestamp must be current and aware.
+The credential below is a placeholder, not a working authentication value.
+
+```json
+{
+  "schema_version": "2.0",
+  "message_id": "11111111-1111-4111-8111-111111111111",
+  "community_id": "22222222-2222-4222-8222-222222222222",
+  "node_id": "33333333-3333-4333-8333-333333333333",
+  "home_id": "44444444-4444-4444-8444-444444444444",
+  "device_id": "55555555-5555-4555-8555-555555555555",
+  "sensor_type": "smart_meter",
+  "source": "SIMULATED",
+  "simulation_mode": "REALTIME",
+  "sequence_number": 1,
+  "measured_at": "2026-11-11T17:00:00Z",
+  "credential": "REPLACE_WITH_A_PRIVATE_COMMISSIONED_CREDENTIAL",
+  "units": {
+    "grid_export_energy_kwh": "kWh",
+    "grid_import_energy_kwh": "kWh",
+    "consumption_energy_kwh": "kWh"
+  },
+  "data": {
+    "grid_export_energy_kwh": 5,
+    "grid_import_energy_kwh": 0,
+    "consumption_energy_kwh": 1
+  }
+}
+```
+
+Publish on the topic containing that community/node/public-device tuple. A single
+cumulative reading establishes a baseline; the example alone cannot create 5 kWh
+of eligible injection. Matching processed boundary readings are required.
+
+The default simulator cycle is 15 seconds; this is separate from the default
+900-second accounting interval. Configuration, complete simulator controls and
+transport security settings are defined in [configuration](configuration.md).
+Use `make simulate` after `make demo` for the registered continuous fixture; see
+[getting started](getting-started.md#start-continuous-simulation).

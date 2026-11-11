@@ -1,7 +1,7 @@
 # Security and trust assumptions
 
-This is a tested technical prototype, not an independent production security audit.
-The executed checks and their limits are in [INTEGRATION_REPORT.md](INTEGRATION_REPORT.md).
+This is a technical prototype without an independent production security audit.
+The executed checks and their limits are in [verification report](docs/verification.md).
 
 ## Trust boundaries
 
@@ -87,3 +87,16 @@ independent audits, high availability and a complete WCAG review remain necessar
 Sepolia ETH is a valueless test asset; SUN is an eligible energy credit, not a fiat
 promise. Neither local execution nor a Sepolia deployment establishes legal authority
 to sell electricity or changes an official electricity bill.
+
+## Known authentication and operational gaps
+
+Passwords use bcrypt. Refresh tokens are JWTs, not opaque rotating tokens; logout
+revokes only the presented access-token JTI through Redis. Browser-readable
+`sessionStorage` tokens require careful cross-site scripting prevention. Mail/reset
+code exists but the canonical stack does not deploy its Celery mail worker;
+production reset-token expiry and delivery hardening need separate review.
+
+The repository does not define an official private vulnerability-disclosure contact
+or supported-version policy. No contact address is invented here. Do not disclose
+secrets or exploit details through a public issue without first establishing an
+appropriate private channel with the repository owner.

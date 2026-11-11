@@ -1,258 +1,114 @@
 # Solar Energy Market
 
-A community-energy DePIN prototype using **SUN energy credits and native Anvil /
-Sepolia test ETH**. Authorized meters report energy, a verifier commits eligible
-intervals, the protocol allocates community energy, and a vault atomically delivers
-SUN while settling producer earnings. Consumers can retire delivered SUN against
-approved consumption.
+A prototype for community energy accounting and settlement in Colombia. Authorized
+meters report eligible grid injection and consumption; the platform verifies
+intervals, issues SUN energy credits, allocates community energy and demonstrates
+settlement using native test ETH.
 
-**1 SUN = 1 eligible verified kWh.** Test ETH is used for deposits, settlement and
-gas; it has no real monetary value. Blockchain accounting does not physically route
-electricity or automatically change an official electricity bill. Deploying to
-Sepolia does not establish legal authorization to commercially exchange electricity.
+**1 SUN = 1 kWh of verified eligible energy.** Holding SUN does not automatically
+compensate consumption: retirement also requires an approved, financially delivered
+consumption claim. Test ETH has no real monetary value. Blockchain transactions do
+not route electricity, change official utility bills or authorize commercial energy
+exchange under Colombian law.
 
-[Integration and verification](docs/INTEGRATION_REPORT.md) ·
-[Security and trust](docs/SECURITY_AND_TRUST.md) ·
-[Native protocol](docs/NATIVE_ETH_PROTOCOL.md) ·
-[Automated accounting](docs/AUTOMATED_SETTLEMENT.md) ·
-[IoT protocol](docs/DEPIN_IOT.md) ·
-[Frontend and screenshots](apps/frontend/README.md)
+## How it works
 
-## Architecture and authority
+1. Governance approves a community, policy, memberships, nodes and meters.
+2. Authenticated telemetry is validated and converted into observed energy intervals.
+3. The backend allocates eligible injection to eligible demand and commits evidence.
+4. Governance finalizes the oracle's batch; proven injection can then issue SUN.
+5. Consumers deposit test ETH and producers escrow SUN. Funded allocations deliver
+   SUN and credit producer earnings atomically.
+6. Consumers separately retire delivered SUN; producers withdraw their earnings.
 
-```mermaid
-flowchart LR
-  M[Authorized physical or simulated meters] -->|authenticated MQTT / v2| S[Ingest worker]
-  S --> Q[Quality audit and SQLModel telemetry]
-  Q --> E[Interval processor]
-  E --> A[Allocation and immutable evidence]
-  A --> O[Dedicated oracle worker]
-  O --> C[CommunitySettlement]
-  G[Authorized governance timelock] --> R[CommunityRegistry]
-  R --> C
-  G -->|review / finalization| C
-  C --> SUN[SUN issuance / retirement]
-  C --> V[NativeSettlementVault]
-  U[User wallet signatures] -->|deposit / SUN escrow / withdrawal| V
-  V -->|atomic SUN delivery and ETH earnings| U
-  F[React Spanish application] --> API[FastAPI]
-  API --> Q
-  API --> A
-  API -->|confirmed state reads| V
-```
+DePIN (decentralized physical infrastructure networks) describes the metering and
+node layer; current demonstrations use explicitly simulated devices. DeFi
+(decentralized finance) describes wallet and contract settlement. Verification,
+indexing and orchestration still depend on authorized backend services and
+operators. See [architecture](docs/architecture.md) and [trust assumptions](SECURITY.md).
 
-Creating a community produces a proposal, not operational authority. The timelock
-approves lifecycle transitions, policies, memberships, nodes and meters. A community
-operator manages supported off-chain operations; an oracle submits evidence and
-processes approved settlement jobs. Neither can withdraw another user's funds.
-Governance is role-based; the application does not fabricate DAO votes.
+## Stack and repository
 
-SUN is issued only from a finalized evidence commitment and an authorized injection
-claim. Gross PV generation and net grid export are distinct. Energy deltas use
-integer Wh; money uses integer wei. Allocation, ETH settlement and SUN retirement
-are separate operations. Retirement burns credits against delivered consumption,
-creates no second ETH payment, and cannot be repeated for the same claim. Fungible
-SUN does not itself retain a unique per-token origin; provenance resides in the
-issuance/evidence ledger.
+| Directory | Implemented responsibility |
+| --- | --- |
+| [apps/frontend](apps/frontend) | Spanish React 19 / TypeScript UI; Vite, TanStack Query, viem, Tailwind, Recharts |
+| [apps/backend](apps/backend) | FastAPI, SQLModel/SQLAlchemy, Alembic, MQTT ingest and settlement workers |
+| [iot](iot) | Coordinated Python simulation, v2 MQTT and diagnostic v1 gRPC gateway |
+| [contracts](contracts) | Solidity 0.8.24, OpenZeppelin contracts, Foundry tests and deployment tooling |
+| [infrastructure/docker](infrastructure/docker) | PostgreSQL 16/TimescaleDB, Redis, Mosquitto, Anvil, API, workers and nginx |
+| [scripts](scripts) | Dependency installation, setup, bootstrap, tests and explicit deployment |
+| [database](database) | Historical SQL artifacts; current schema belongs to SQLModel and Alembic |
 
-## Local prerequisites
+## Quick start
 
-Use Linux, Python 3.12+, Node 24, Docker with Compose, Git and curl. Install pinned
-Foundry, Solidity, Python and npm dependencies:
+Use Linux, Python 3.12+, Node.js 24, Docker Engine with Compose v2, GNU Make, Git
+and curl. The installer pins Foundry tools, compiler and contract libraries; Docker
+uses its own pinned Anvil image.
 
 ```bash
 ./scripts/install_dev.sh
 source .venv/bin/activate
-```
-
-`DEV_TOOLS` and `DEV_VENV` can select existing tool/virtual-environment directories.
-The installer preserves TLS verification and verifies the Solidity compiler checksum.
-All runtime secrets are generated or supplied in ignored environment files.
-
-## Exact local startup
-
-From the repository root, with the virtual environment active:
-
-```bash
 make setup
 make contracts-build
 make demo
-curl -fsS http://127.0.0.1:8000/ready
-curl -fsS http://127.0.0.1:8080/api/v1/openapi.json >/dev/null
-```
-
-Open **http://127.0.0.1:8080**. Log in as `govdemo1@solar.local` (producer/operator),
-`govdemo2@solar.local` (consumer), or `govadmin@solar.local` (governance fixture).
-Read `SEED_PASSWORD` securely from `infrastructure/docker/.env`; it is never printed
-or committed. These accounts and credentials are development-only.
-
-`make setup` prepares missing local credentials without replacing existing values,
-builds images, waits for PostgreSQL/Redis/MQTT/Anvil, applies reviewed Alembic
-migrations in a dedicated one-off service, then starts API, workers and frontend.
-It never generates migrations at startup. Anvil state and PostgreSQL are persistent
-volumes. API and worker RPC chain IDs must match. Internal Docker hostnames bypass
-only the HTTP proxy; external connections retain proxy and CA trust.
-
-`make demo` creates a stable SQLModel community, five users/homes, fifteen simulated
-devices, a separate governance fixture, node/meter registrations, an immutable
-0.001 ETH/kWh policy and a native deployment. Actual timelock transactions authorize
-activation and membership. The local zero-delay timelock is explicitly a demo
-convenience; public deployment requires a one-day minimum. The dedicated backend
-oracle receives only oracle/settlement authority. The timelock's initial SUN minter
-role is revoked after granting mint authority to CommunitySettlement.
-
-Demo wallets are deterministically derived from a private local seed, isolated from
-existing linked wallets, funded/unlocked **only on Anvil**, and exported as encrypted
-keystores under `.run/demo/wallets` (password: `SEED_PASSWORD`). Never expose these
-through the frontend or commit them. Import a keystore securely into a development
-wallet if using the actual extension; automated browser tests use an explicit local
-wallet transport. Existing unrelated users, wallets and accounting are preserved.
-A rerun checks deployment hashes and identities rather than resetting balances,
-changing ownership or reactivating suspended memberships.
-
-## Deterministic physical and financial demonstration
-
-Run the finite scenario on reserved demonstration homes 1 and 2:
-
-```bash
 make demo-scenario
 ```
 
-This uses actual MQTT, FastAPI, background workers and Anvil receipts. It publishes
-registered, explicitly simulated boundary readings for an ended 15-minute interval,
-rejects an invalid credential, and replays valid messages to verify deduplication.
-Home A exports 5 kWh; home B imports/consumes 3 kWh. Expected confirmed results:
+Open **[http://127.0.0.1:8080](http://127.0.0.1:8080)**. Use `govdemo1@solar.local` (producer/operator) or
+`govdemo2@solar.local` (consumer). Read the generated `SEED_PASSWORD` privately from
+`infrastructure/docker/.env`. Never commit that file or import local fixture keys
+into a public-network account.
 
-| Quantity | Result |
+`make setup` starts services and runs migrations; `make demo` separately deploys and
+commissions the local community. The scenario has been executed locally with
+5 kWh injection, 3 kWh allocation, 0.003 ETH settlement and 3 SUN retirement.
+[Getting started](docs/getting-started.md) covers verification, continuous simulation,
+wallet setup, credentials and the distinction between bootstrap and plain seed data.
+
+## Development and tests
+
+```bash
+make test                    # contracts, backend integration, IoT and frontend
+python scripts/sync_abis.py   # check compiled contracts against application ABIs
+```
+
+Run these after activating the installed virtual environment. Browser tests also
+need the development stack and Vite; see [development](docs/development.md).
+Configuration is documented in [configuration](docs/configuration.md), operations
+in [deployment](docs/deployment.md).
+
+## Documentation
+
+| Guide | Canonical subject |
 | --- | --- |
-| Eligible injection / demand | 5 kWh / 3 kWh |
-| Allocated / unallocated energy | 3 kWh / 2 kWh |
-| Price | 0.001 test ETH/kWh |
-| Consumer deposit | 0.01 test ETH |
-| Obligation / producer entitlement | 0.003 test ETH / 0.003 test ETH |
-| SUN issued / delivered / retired | 5 SUN / 3 SUN / 3 SUN |
-| Remaining consumer vault funds | 0.007 test ETH |
-| Producer earnings withdrawn | 0.003 test ETH |
-| Remaining SUN supply | 2 SUN |
+| [Architecture](docs/architecture.md) | Components, trust boundaries and decisions |
+| [Getting started](docs/getting-started.md) | Local installation and demonstration |
+| [Configuration](docs/configuration.md) | Settings, defaults and secret handling |
+| [Database](docs/database.md) | Actual SQLModel tables, relationships and migrations |
+| [API](docs/api.md) | Authentication, routes, examples and OpenAPI |
+| [IoT](docs/iot.md) | Commissioning, wire protocol, physics and quality |
+| [Blockchain](docs/blockchain.md) | Contracts, authority, wallet calls and reconciliation |
+| [Community settlement](docs/community-settlement.md) | Eligibility, allocation, money, SUN and corrections |
+| [Deployment](docs/deployment.md) | Compose operations and Sepolia procedure |
+| [Development](docs/development.md) | Tests, frontend conventions and documentation maintenance |
+| [Verification](docs/verification.md) | Prior executed integration evidence and its limits |
+| [Security](SECURITY.md) | Trust assumptions and unresolved security work |
+| [Documentation audit](docs/documentation-audit.md) | Consolidation inventory, corrections and checks |
 
-The explicit local fixture authority finalizes the reviewed batch through its
-timelock. This command refuses Sepolia; a server must never impersonate public
-users or automatically substitute itself for public governance. A resumable journal
-records each user transaction hash before confirmation. A completed rerun verifies
-existing receipts and projections without issuing a second payment or retirement.
-Evidence and results are in `.run/demo/scenario-report.json`.
+## Status and limitations
 
-For continuous registered REALTIME simulation on independent homes 3, 4 and 5:
+The complete local native ETH workflow is implemented and tested. Sepolia deployment
+tooling exists, but no public deployment or MetaMask-extension end-to-end execution
+is evidenced. Simulated telemetry is eligible only in opted-in local Anvil
+communities; Sepolia requires commissioned physical sources. No calibrated physical
+meter deployment, independent security audit or production readiness is claimed.
 
-```bash
-make simulate
-```
+Native ETH P2P trading, public community discovery, profile editing, complete
+participant evidence/event histories, automatic financial reversals and utility
+billing integration are absent. Historical USDx/COPx and redemption code remains
+separate; legacy settlement workers are disabled by default.
 
-The simulator uses the exact public UUID registry and private credential bindings
-produced by bootstrap; QoS1, sequence checkpoints and source labels are preserved.
-REALTIME simulation waits for real intervals and the two-minute late-arrival margin.
-Offline/accelerated simulation remains explicitly distinguishable and is withheld
-from live settlement. The generated home catalogue reserves homes 1/2 for the finite fixture and uses
-separate home 3/4/5 meter identities for continuous simulation. Do not override that
-separation or mix counter/sequence streams on the same device.
+## License
 
-## Meter registration outside the local fixture
-
-1. Register/login and verify wallet ownership using the signed challenge API.
-2. Propose a community; governance reviews, approves policy/price and activates it.
-3. Apply for membership and synchronize confirmed registry status.
-4. Create a home; an operator proposes its node.
-5. Governance registers the node owner and authorizes the public meter UUID.
-6. The operator records the internal device UUID and a fresh 32+ character telemetry
-   credential through `/communities/nodes/{node_id}/meters`.
-7. Publish v2 packets on `solar/{community}/{node}/{device}/telemetry`. Signatures,
-   units, timestamp, sequence, device type, source and physical plausibility are
-   checked. Raw credentials are not stored in telemetry or quality evidence.
-
-Use authenticated per-device broker ACLs and TLS across untrusted networks. The
-anonymous development broker binds only to loopback. Provision grants with
-`scripts/provision_mqtt_acl.py` and the secure MQTT overlays documented in
-[DEPIN_IOT.md](docs/DEPIN_IOT.md).
-
-## Sepolia deployment
-
-See [the deployment runbook](docs/SEPOLIA_DEPLOYMENT.md). No Sepolia RPC/deployer
-credential is bundled. Test ETH must come from an externally funded account or an
-available external faucet; unrestricted faucet access is never assumed.
-
-The canonical entry point is `scripts/deploy.sh COMMUNITY_UUID --network sepolia`.
-It performs chain, funding, explicit authority and artifact checks without sending.
-Adding `--broadcast` explicitly deploys and waits for three confirmations per
-contract. Public journals preserve pending hashes for recovery. Deployment does
-not activate a community: governance must review and execute the separate setup
-plan, approve the community, authorize nodes/meters and finalize evidence.
-
-Only confirmed deployment addresses belong in backend/frontend configuration.
-Frontend Vite variables are public; private keys and authenticated RPC credentials
-must never be placed in `VITE_*` settings. MetaMask connection is separate from
-application login and wallet ownership verification. Switch to chain 11155111,
-fund gas/deposits with test ETH, and review every contract/value before signing.
-
-## Tests and migrations
-
-```bash
-make test                    # Foundry, real backend integration, IoT, frontend
-make test-backend             # fresh disposable PostgreSQL; MQTT/Redis/Anvil test ports
-make test-iot                 # isolated broker and gRPC gateway; no development broker dependency
-make test-frontend            # strict types, lint, unit/component/hook/wallet tests, build
-make migrate                 # existing reviewed Alembic revisions only
-```
-
-For browser integration, keep the local stack running and start Vite in another
-terminal, then create a fresh stateful browser fixture:
-
-```bash
-cd apps/frontend
-npm run dev -- --host 127.0.0.1
-# Another terminal in apps/frontend:
-npm run test:e2e:all
-```
-
-The native browser suite mutates test contracts (retirement/membership); its command
-creates a fresh fixture for every complete run. Actual API, signed ownership proofs,
-Anvil calls and receipt/index confirmation are used; production screens contain no
-mock success data. The actual extension and live Sepolia need separate verification.
-
-```bash
-make ps
-make logs
-make down                    # preserves volumes
-make up
-python scripts/sync_abis.py  # checks compiled artifacts against backend/frontend ABIs
-```
-
-## Operational checks and troubleshooting
-
-- `/health` checks API/database liveness; frontend `/health` checks static serving.
-  `/ready` on port 8000 additionally checks Redis, matching RPC chain and fresh
-  worker/subscriber heartbeats. Missing/degraded workers cannot report ready.
-- Configuración shows service readiness. Authorized community operators can query
-  `/api/v1/communities/{id}/operations/status` for index lag, failed jobs,
-  reconciliation alerts and telemetry quality counts. Device health reports source,
-  freshness, authorization, assessments and recent intervals.
-- Submitted is not confirmed. Wait for receipt depth **and** event indexing. If a
-  transaction is delayed/replaced or the indexer lags, use Transacciones and the
-  operator's reconciliation controls. Do not repeat a payment on an unknown outcome.
-- If bootstrap refuses a wallet, identity, credential or deployment mismatch, review
-  it; existing ownership is not overwritten. Preserve PostgreSQL and Anvil state
-  together. A deliberate chain reset requires a fresh demo database/journal or an
-  explicit accounting migration, not silent reuse of old confirmed records.
-- With a cloud proxy, retain proxy/TLS settings and mount the combined CA bundle.
-  `CLOUD_CA_BUNDLE` can select it. Both `NO_PROXY` and `no_proxy` include only internal
-  service names and loopback. An RPC 403 or chain mismatch is a connectivity/config
-  failure, never proof of a confirmed settlement.
-- MQTT access failures: check provisioned identity, exact topic ACL, credential,
-  certificate trust, last authenticated reading and the quality audit. A fresh
-  arrival timestamp does not make an old measurement current.
-
-Legacy payment-token contracts and tests remain for historical compatibility;
-legacy workers are disabled by default (`LEGACY_SETTLEMENT_ENABLED=false`). Old
-USDx instructions are superseded by this native protocol. Native ETH P2P trading,
-public community discovery, profile editing, full participant-visible evidence and
-complete SUN event histories remain outside the current API. This is a technical
-prototype, not a production security audit or a regulatory approval.
+No repository-wide license file is present. Individual source files and third-party
+packages may carry their own notices; this README does not grant a new license.
