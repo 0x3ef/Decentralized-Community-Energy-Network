@@ -1,4 +1,4 @@
-# Solar Energy Market
+# Decentralized Community Energy Network
 
 A prototype for community energy accounting and settlement in Colombia. Authorized
 meters report eligible grid injection and consumption; the platform verifies
