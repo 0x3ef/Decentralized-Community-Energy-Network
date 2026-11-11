@@ -136,6 +136,16 @@ checks unauthorized and missing-batch requests, prepares the app's timelock plan
 executes its schedule/execute calldata on local Anvil, and confirms producer SUN
 issuance. Historical rejected/incomplete intervals are retained.
 
+A subsequent startup correction moves `accounting_interval_seconds` from the
+smart-meter generator constructor to `SimulationConfig`. The earlier accounting
+and governance checks did not exercise this CLI wiring and missed the startup
+TypeError. Two entrypoint regressions now execute the module and check the
+continuous configuration path. The full IoT suite passes 95 tests with 88.18%
+coverage. A newly built simulator Docker image also passed a finite console cycle
+and continuous REALTIME startup with aligned UTC telemetry, followed by graceful
+shutdown. These isolated container checks use the console publisher, not a claim
+about a remote user's broker or database readiness.
+
 ## Earlier verification context retained
 
 Earlier reports described distinct implementation stages, not simultaneous current
