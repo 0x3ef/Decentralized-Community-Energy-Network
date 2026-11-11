@@ -33,6 +33,24 @@ def update(path, values):
     path.chmod(0o600)
 
 
+def validate_repair_environment(path):
+    if not path.is_file():
+        raise SystemExit(
+            "Restore the original infrastructure/docker/.env before repair; no services were stopped"
+        )
+    values = dotenv_values(path)
+    # Match backend Settings defaults for omitted fields. Explicit public or
+    # empty values still fail closed, and the container checks the actual RPC.
+    if values.get("ENVIRONMENT", "development") != "development":
+        raise SystemExit(
+            "Repair requires ENVIRONMENT=development in infrastructure/docker/.env; no services were stopped"
+        )
+    if values.get("CHAIN_ID", "31337") not in ("31337", "1337"):
+        raise SystemExit(
+            "Repair requires local CHAIN_ID=31337 or 1337 in infrastructure/docker/.env; no services were stopped"
+        )
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -42,14 +60,7 @@ def main():
     )
     args = parser.parse_args()
     if args.recommission:
-        values = dotenv_values(ROOT / "infrastructure/docker/.env")
-        if values.get("ENVIRONMENT") != "development" or values.get("CHAIN_ID") not in (
-            "31337",
-            "1337",
-        ):
-            raise SystemExit(
-                "Repair requires the original local-development env file; no services were stopped"
-            )
+        validate_repair_environment(ROOT / "infrastructure/docker/.env")
     directory = ROOT / ".run/demo"
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     artifacts = ROOT / "contracts/out"
