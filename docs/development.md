@@ -25,6 +25,8 @@ environment**, not inside a test container. Their script starts disposable test
 services, creates a uniquely named PostgreSQL database, applies all migrations,
 runs pytest and drops only that database on exit. Ports are PostgreSQL 55432,
 MQTT 18884, Redis 16379 and Anvil 18545. Do not substitute development endpoints.
+Test Compose commands explicitly select `solar-prototype-tests`, overriding any
+private development COMPOSE_PROJECT_NAME so tests cannot recreate the app node.
 The IoT test script starts its own gateway and uses the isolated broker; its
 coverage gate is 80%.
 

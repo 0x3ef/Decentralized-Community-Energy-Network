@@ -194,3 +194,25 @@ This is a new local demonstration, not restoration of the old chain's contracts,
 receipts or financial entitlements. No old financial rows were relabeled or imported
 as new balances. No full backend/frontend suite or public network acceptance was
 rerun as part of this infrastructure correction.
+
+## Same-database recommissioning and test isolation
+
+`make repair-demo` now supports an unused local deployment whose registry code is
+missing while retaining the existing PostgreSQL database and private identities.
+The integrated governed MQTT test preserves an existing address, password hash and
+historical telemetry row, recreates the local contracts, verifies cursor rebinding,
+then completes issuance, delivery, retirement and withdrawal. It refuses intact
+registries, changed seed credentials and existing financial history. A Docker CLI
+smoke test separately retained six users, five homes, password hashes and telemetry
+while replacing the missing registry binding.
+
+The backend suite passed **51 tests** and the IoT suite passed **90 tests** at
+85.14% coverage. Test runners and the broker-restart case explicitly select the
+`solar-prototype-tests` project: an inherited development project name can no
+longer redirect their Compose operations. Development Anvil and PostgreSQL container
+IDs were unchanged across the isolated full backend run. Scoped Ruff, shell syntax,
+Markdown lint, local links/schema checks and whitespace validation passed.
+
+This does not claim that a remote user's repair was already executed. The command
+creates a private SQL backup before attempting changes and refuses to reuse any
+recorded financial entitlement on a replacement chain.

@@ -140,7 +140,8 @@ contract addresses and financial projections cannot safely survive an independen
 chain reset. Destructive cleanup is intentionally outside normal startup.
 Operational failures and Sepolia configuration belong in [deployment](deployment.md).
 
-If Anvil lost its contracts and no valid chain backup exists, use the
-[isolated local recovery workflow](deployment.md#recover-a-local-demo-after-lost-anvil-state).
-It preserves old data and creates a new demo with different credentials rather
-than silently reusing financial history.
+If local contracts disappeared and there is no financial history, use
+[repair on the same database](deployment.md#repair-unused-local-contracts-on-the-same-database).
+For a separate fresh demonstration with archived historical data, use the
+[isolated recovery workflow](deployment.md#recover-a-local-demo-after-lost-anvil-state).
+Neither path silently reuses old financial entitlements.

@@ -36,7 +36,9 @@ def identifier(value):
     return uuid5(NAMESPACE_URL, "solar-governed-demo:v1:" + value)
 
 
-async def bootstrap(factory, web3, artifacts, output, password, device_key):
+async def bootstrap(
+    factory, web3, artifacts, output, password, device_key, *, recommission=False
+):
     if Config.ENVIRONMENT != "development" or web3.eth.chain_id not in (31337, 1337):
         raise ValueError("Demo bootstrap is restricted to development Anvil")
     if (
@@ -48,6 +50,13 @@ async def bootstrap(factory, web3, artifacts, output, password, device_key):
         raise ValueError(
             "Set SEED_PASSWORD (12+), SEED_DEVICE_KEY (32+) and the dedicated backend oracle key"
         )
+    if recommission:
+        from src.protocol.recommission import assert_recommission_allowed
+
+        async with factory() as db:
+            await assert_recommission_allowed(
+                db, web3, artifacts, identifier("community")
+            )
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True, mode=0o700)
     # Derive isolated local fixtures without embedding or logging a private key.
@@ -62,6 +71,23 @@ async def bootstrap(factory, web3, artifacts, output, password, device_key):
     ]
     governor = local_accounts[0].address
     owners = [account.address for account in local_accounts[1:]]
+    if recommission:
+        from src.protocol.recommission import RecommissionError
+
+        async with factory() as db:
+            for number, owner in enumerate(owners, 1):
+                existing_user = await db.get(User, identifier(f"user:{number}"))
+                if existing_user and not verify_password(
+                    password, existing_user.password_hash
+                ):
+                    raise RecommissionError(
+                        "Restore the original SEED_PASSWORD; existing login credentials will not be overwritten"
+                    )
+                existing_wallet = await db.get(Wallet, identifier(f"wallet:{number}"))
+                if existing_wallet and existing_wallet.address.lower() != owner.lower():
+                    raise RecommissionError(
+                        "Restore the original SEED_DEVICE_KEY; existing wallet ownership will not be overwritten"
+                    )
     oracle = Account.from_key(Config.BACKEND_PRIVATE_KEY).address
     if oracle.lower() in {x.address.lower() for x in local_accounts}:
         raise ValueError(
@@ -114,6 +140,7 @@ async def bootstrap(factory, web3, artifacts, output, password, device_key):
             ),
             owners[0],
         )
+    activation_hash = None
     state = registry.functions.communities(deployment.cid).call()[2]
     if state == 1:
         deployment.govern(registry.functions.transition(deployment.cid, 2, ZERO))
@@ -128,7 +155,10 @@ async def bootstrap(factory, web3, artifacts, output, password, device_key):
     for fn in deployment.setup_calls():
         deployment.govern(fn)
     if state == 3:
-        deployment.govern(registry.functions.transition(deployment.cid, 4, owners[0]))
+        activation = deployment.govern(
+            registry.functions.transition(deployment.cid, 4, owners[0])
+        )
+        activation_hash = Web3.to_hex(activation.transactionHash)
     members, device_registry, bindings = [], {}, {}
     async with factory() as db:
         await db.execute(text("SELECT pg_advisory_xact_lock(707031502)"))
@@ -145,12 +175,15 @@ async def bootstrap(factory, web3, artifacts, output, password, device_key):
         if (
             community.registry_address
             and community.registry_address.lower() != registry.address.lower()
+            and not recommission
         ):
             raise ValueError(
                 "Existing demo registry differs; refusing to overwrite accounting"
             )
         community.status = "ACTIVE"
         community.registry_address = registry.address
+        if activation_hash:
+            community.governance_transaction = activation_hash
         community.policy_hash = policy
         community.boundary_hash = boundary
         # The proposer FK is assigned after users are inserted.
@@ -386,6 +419,30 @@ async def bootstrap(factory, web3, artifacts, output, password, device_key):
                     vault_address=vault.address,
                 )
             )
+        elif recommission:
+            native.chain_id = web3.eth.chain_id
+            native.sun_address = sun.address
+            native.settlement_address = settlement.address
+            native.vault_address = vault.address
+            from src.modules.settlement.models import (
+                IndexedNativeEvent,
+                NativeSyncCursor,
+            )
+            from src.protocol.recommission import GOVERNANCE_EVENTS
+
+            cursor = await db.get(NativeSyncCursor, cid)
+            if cursor:
+                cursor.block_number = -1
+                cursor.block_hash = None
+            for event in (
+                await db.exec(
+                    select(IndexedNativeEvent).where(
+                        IndexedNativeEvent.community_id == cid,
+                        IndexedNativeEvent.event_name.in_(GOVERNANCE_EVENTS),
+                    )
+                )
+            ).all():
+                event.canonical = False
         elif native.sun_address.lower() != sun.address.lower():
             raise ValueError("Existing native deployment differs")
         await db.commit()

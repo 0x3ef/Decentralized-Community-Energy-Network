@@ -96,6 +96,46 @@ Broker authentication/TLS provisioning is documented in [IoT](iot.md#broker-acls
 The local fixed database credentials and anonymous broker must not be exposed as
 a public production system.
 
+## Repair unused local contracts on the same database
+
+When the original local chain was lost but the database contains only identity,
+device and telemetry data, use this path to keep the **same database and Compose
+project**. It does not create another SQL volume or rotate participant credentials.
+
+With the original private `.env` and `.run/demo` files retained, the local node
+running and the Python environment active:
+
+```bash
+make build
+make repair-demo
+make simulate
+curl --max-time 10 -sS http://127.0.0.1:8000/ready
+```
+
+The wrapper temporarily stops API/worker/subscriber writes and exports a private
+PostgreSQL dump to `.run/demo/sql-backup-*.dump`. It commissions missing local
+contracts and synchronizes their bindings, activation receipt and empty native
+index cursor. Existing users, password hashes, wallets, homes, devices, telemetry,
+counters, meter credentials and pending physical credits are preserved. Old/new
+binding metadata and the old deployment journal are archived in
+`.run/demo/recommission-*`. The original SEED_PASSWORD and SEED_DEVICE_KEY must
+match existing identities; the repair refuses to overwrite ownership or passwords.
+
+Recommissioning refuses public networks, an intact registry, existing SUN supply
+or vault funds, and recorded native batches, participant transactions, indexed
+financial events, signed/native jobs, approved/issued credits or historical financial
+data. Old governance-only indexed events remain retained as noncanonical audit
+records and the new registry is indexed afresh.
+Even pending financial records require review. These guards do not infer the
+absence of a payment merely from a user's recollection. No financial history is
+deleted or assigned to the new contracts. If a guard stops the command, inspect its
+reason; do not clear tables to bypass it.
+
+After repair, current telemetry should advance and `/ready` should show worker
+and subscriber ready. `make demo-scenario` can separately verify funded settlement
+and retirement; it performs actual local test transactions. That is a validation
+step, not a prerequisite for preserving old telemetry.
+
 ## Recover a local demo after lost Anvil state
 
 If RPC is healthy but the database's registry address has zero bytecode, the

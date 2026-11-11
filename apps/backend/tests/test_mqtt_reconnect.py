@@ -77,6 +77,8 @@ def test_publisher_recovers_after_disposable_broker_restart():
             [
                 "docker",
                 "compose",
+                "--project-name",
+                "solar-prototype-tests",
                 "-f",
                 str(root / "infrastructure/docker/compose.tests.yml"),
                 "restart",
