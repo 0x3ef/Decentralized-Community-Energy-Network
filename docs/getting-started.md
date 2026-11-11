@@ -97,6 +97,14 @@ using generated `.run/demo/compose.env`, registry, catalogue and private credent
 bindings. Homes 1/2 remain reserved for the finite scenario. Never mix independent
 counter/sequence streams on one meter. Interval accounting waits for observed
 boundaries and the two-minute grace period; it is not an instant minting loop.
+The REALTIME scheduler samples UTC boundaries even after an unaligned startup.
+Completed eligible intervals are batched/submitted by the worker. To approve a
+reviewed batch manually, open **Liquidación**, its detail, then **preparar la
+finalización del lote**. In **Gobernanza**, the authorized wallet prepares,
+schedules and executes **Finalizar lote energético** after the challenge and
+timelock delays. Confirmed finalization enables worker issuance; ETH/SUN deposits
+are only needed for the subsequent funded exchange. Existing incomplete or
+rejected historical intervals are retained, not converted into new credits.
 See [IoT](iot.md) for offline/fault modes and physical commissioning.
 
 ## Frontend development

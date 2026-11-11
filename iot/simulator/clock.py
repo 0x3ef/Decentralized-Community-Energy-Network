@@ -2,6 +2,29 @@
 
 import time
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+
+
+def next_sample_at(
+    now: datetime, step_seconds: float, boundary_seconds: int = 900
+) -> datetime:
+    """Next UTC sample slot, including every accounting boundary.
+
+    Never round a current reading backwards or invent missed observations.
+    Including boundaries separately also supports cadences that do not divide
+    the accounting interval (for example, seven seconds).
+    """
+    if now.tzinfo is None or step_seconds <= 0 or boundary_seconds <= 0:
+        raise ValueError("Aware time and positive sampling intervals required")
+    epoch = datetime(1970, 1, 1, tzinfo=UTC)
+    delta = now.astimezone(UTC) - epoch
+    micros = (delta.days * 86400 + delta.seconds) * 1000000 + delta.microseconds
+    step = int(Decimal(str(step_seconds)) * 1000000)
+    boundary = boundary_seconds * 1000000
+    if step < 1:
+        raise ValueError("Sampling precision must be at least one microsecond")
+    slot = min((micros // step + 1) * step, (micros // boundary + 1) * boundary)
+    return epoch + timedelta(microseconds=slot)
 
 
 class SimulationClock:

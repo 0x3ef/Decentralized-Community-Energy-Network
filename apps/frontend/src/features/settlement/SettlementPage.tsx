@@ -382,6 +382,16 @@ export function SettlementDetail() {
               title={`${date(batch.data.interval_start)} — ${date(batch.data.interval_end)}`}
             >
               <Badge value={batch.data.status} />
+              {batch.data.status === "CHALLENGEABLE" && (
+                <Notice>
+                  Pendiente de aprobación de gobernanza. Una vez vencido el
+                  período de revisión, la wallet autorizada puede{" "}
+                  <Link to={`/gobernanza?action=finalize_batch&batch=${batch.data.id}`}>
+                    preparar la finalización del lote
+                  </Link>
+                  . La emisión SUN se tramita después de finalizarlo.
+                </Notice>
+              )}
               <div className="metrics">
                 <Metric
                   label="Inyección verificada"

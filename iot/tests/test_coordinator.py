@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from generators import (
@@ -108,3 +110,76 @@ def test_failed_publish_retries_original_sequence_before_new_measurements(
         message["sequence_number"] == pending[message["device_id"]]
         for message in recovered
     )
+
+
+class WallTime:
+    def __init__(self, at):
+        self.at = at
+
+    def now(self):
+        return self.at
+
+
+class AdvancingStop:
+    """Advance simulated wall time instead of sleeping in scheduler tests."""
+
+    def __init__(self, clock, end, stall=0):
+        self.clock, self.end, self.stall = clock, end, stall
+
+    def is_set(self):
+        return self.clock.at > self.end
+
+    def wait(self, seconds):
+        self.clock.at += timedelta(seconds=seconds + self.stall)
+        self.stall = 0
+
+
+def test_realtime_waits_for_utc_slots_and_observes_both_interval_boundaries(
+    sample_home, generators
+):
+    start = datetime(2026, 11, 11, 17, 0, tzinfo=UTC)
+    clock = WallTime(start - timedelta(seconds=4, microseconds=137))
+    simulator = Simulator([sample_home], generators)
+    simulator._clock = clock
+    messages = []
+    simulate_cycle = simulator.simulate_cycle
+
+    def record(at):
+        assert at <= clock.now()  # no future-dated observations
+        messages.extend(simulate_cycle(at))
+
+    simulator.simulate_cycle = record
+    simulator.run(AdvancingStop(clock, start + timedelta(minutes=15)))
+    times = {datetime.fromisoformat(m["measured_at"]) for m in messages}
+    assert len(times) == 61
+    assert min(times) == start and max(times) == start + timedelta(minutes=15)
+    assert all(t.microsecond == 0 and t.second % 15 == 0 for t in times)
+    by_device = [m for m in messages if m["sensor_type"] == "smart_meter"]
+    assert [m["sequence_number"] for m in by_device] == list(range(1, 62))
+
+
+def test_realtime_stall_does_not_backfill_missing_boundary(sample_home, generators):
+    boundary = datetime(2026, 11, 11, 17, 15, tzinfo=UTC)
+    clock = WallTime(boundary - timedelta(seconds=1))
+    simulator = Simulator([sample_home], generators)
+    simulator._clock = clock
+    observed = []
+    simulator.simulate_cycle = observed.append
+    simulator.run(AdvancingStop(clock, boundary + timedelta(seconds=45), stall=20))
+    assert observed == [
+        boundary + timedelta(seconds=30),
+        boundary + timedelta(seconds=45),
+    ]
+
+
+def test_utc_scheduler_includes_boundaries_for_non_dividing_cadence():
+    from simulator.clock import next_sample_at
+
+    boundary = datetime(2026, 11, 11, 17, 15, tzinfo=UTC)
+    at = boundary - timedelta(seconds=8)
+    seen = []
+    while at < boundary:
+        at = next_sample_at(at, 7)
+        seen.append(at)
+    assert seen[-1] == boundary
+    assert next_sample_at(boundary, 7) > boundary

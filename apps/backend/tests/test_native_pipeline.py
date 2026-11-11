@@ -432,7 +432,44 @@ async def test_native_pipeline_replay_crash_recovery_and_reorganization(monkeypa
             ).one().transaction_hash == original_hash
         w3.provider.make_request("evm_increaseTime", [2])
         w3.provider.make_request("evm_mine", [])
-        govern(settlement.functions.finalize(binary(batch.chain_batch_id)))
+        assert sun.functions.balanceOf(producer_wallet).call() == 0
+        # The app's governance flow must prepare the settlement target, enforce
+        # proposer authority, and leave execution to the user's wallet.
+        finalize_url = f"/api/v1/communities/{cid}/governance/prepare"
+        denied = await client.post(
+            finalize_url,
+            json={"action": "finalize_batch", "batch_id": batch_id},
+            headers=headers(users[0]),
+        )
+        assert denied.status_code == 403, denied.text
+        missing = await client.post(
+            finalize_url,
+            json={"action": "finalize_batch", "batch_id": str(uuid4())},
+            headers=headers(governance_user),
+        )
+        assert missing.status_code == 404, missing.text
+        proposal = await client.post(
+            finalize_url,
+            json={"action": "finalize_batch", "batch_id": batch_id},
+            headers=headers(governance_user),
+        )
+        assert proposal.status_code == 200, proposal.text
+        proposal = proposal.json()
+        assert proposal["to"] == settlement.address
+        assert proposal["timelock"] == governor.address
+        assert sun.functions.balanceOf(producer_wallet).call() == 0
+        for operation in ("schedule", "execute"):
+            tx = proposal[operation]
+            receipt = w3.eth.wait_for_transaction_receipt(
+                w3.eth.send_transaction(
+                    {
+                        "from": oracle.address,
+                        "to": tx["to"],
+                        "data": tx["data"],
+                    }
+                )
+            )
+            assert receipt.status == 1
         await reconcile()
         await advance_jobs()
         assert sun.functions.balanceOf(producer_wallet).call() == 5 * 10**18

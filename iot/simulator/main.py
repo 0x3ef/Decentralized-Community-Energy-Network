@@ -53,6 +53,7 @@ def main() -> None:
         SensorType.SMART_METER: SmartMeterGenerator(
             use_grpc=settings.use_grpc,
             interval_seconds=settings.interval_seconds,
+            accounting_interval_seconds=settings.accounting_interval_seconds,
             random_seed=settings.random_seed,
         ),
         SensorType.SOLAR_INVERTER: SolarInverterGenerator(

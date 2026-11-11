@@ -122,6 +122,20 @@ current API. Legacy payment-token workers are disabled by default; old artifacts
 are retained for compatibility. Reconciliation quarantines stale historical local
 communities rather than deleting their users or inventing replacement receipts.
 
+## Continuous simulation and app approval correction
+
+The continuous-sampling and app batch-finalization correction was checked locally
+on 2026-11-11 with 57 backend tests, 93 IoT tests (85.74% coverage), 38 frontend
+tests, strict frontend types, lint and a production build. A Chromium protected-route
+check also passed; it is not a live MetaMask approval test. The accounting regression
+starts the REALTIME loop at an arbitrary second and advances an injected clock
+through 61 actual simulator cycles, then ingests/processes the resulting readings
+into PostgreSQL and verifies a finalized interval and pending credit. It does not
+wait 15 real minutes or invoke `demo-scenario`. The native pipeline regression
+checks unauthorized and missing-batch requests, prepares the app's timelock plan,
+executes its schedule/execute calldata on local Anvil, and confirms producer SUN
+issuance. Historical rejected/incomplete intervals are retained.
+
 ## Earlier verification context retained
 
 Earlier reports described distinct implementation stages, not simultaneous current

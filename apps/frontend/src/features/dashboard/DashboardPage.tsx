@@ -104,7 +104,7 @@ export default function DashboardPage() {
               <Metric
                 label="Exportación verificada elegible"
                 value={kwh(totals("eligible_export_wh"))}
-                hint="Sujeta a aprobación del protocolo"
+                hint="No equivale a SUN emitidos; consulta Créditos y Liquidación"
               />
               <Metric
                 label="Energía importada"

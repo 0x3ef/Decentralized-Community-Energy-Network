@@ -1,5 +1,6 @@
 import { statusLabel } from "../../shared/ui/i18n";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTimelock } from "../../shared/blockchain/read-hooks";
 import { useRoles } from "../../shared/blockchain/WalletProvider";
 import {
@@ -61,7 +62,7 @@ function TimelockOperation({ plan }: { plan: Plan }) {
       </QueryState>
       <div className="actions">
         <button
-          disabled={activeState(tx.state) || ready.data?.done}
+          disabled={activeState(tx.state) || ready.data?.done || ready.data?.pending}
           onClick={() =>
             void tx.begin({
               action: "governance_schedule",
@@ -124,11 +125,14 @@ function TimelockOperation({ plan }: { plan: Plan }) {
   );
 }
 export default function GovernancePage() {
+  const [params] = useSearchParams();
   const roles = useRoles(),
     { id, community } = useCommunity(),
     { user } = useAuth(),
     tx = useTransactions();
-  const [action, setAction] = useState("transition"),
+  const [action, setAction] = useState(
+      params.get("action") === "finalize_batch" ? "finalize_batch" : "transition",
+    ),
     [error, setError] = useState(""),
     [plans, setPlans] = useState<Plan[]>(loadPlans);
   async function prepare(data: FormData) {
@@ -143,6 +147,7 @@ export default function GovernancePage() {
       };
       if (data.get("node_id")) body.node_id = data.get("node_id");
       if (data.get("meter_id")) body.meter_id = data.get("meter_id");
+      if (action === "finalize_batch") body.batch_id = data.get("batch_id");
       if (action === "price")
         body.price_wei_per_kwh = parseAmount(
           String(data.get("price")),
@@ -163,7 +168,10 @@ export default function GovernancePage() {
             user: user!.uid,
             prepared,
             action,
-            description: `${action} · comunidad ${id}`,
+            description:
+              action === "finalize_batch"
+                ? `Finalizar lote ${String(body.batch_id)}`
+                : `${action} · comunidad ${id}`,
           },
           ...plans,
         ];
@@ -229,6 +237,7 @@ export default function GovernancePage() {
                   <option value="membership">Estado de membresía</option>
                   <option value="node">Registrar nodo</option>
                   <option value="meter">Autorizar medidor</option>
+                  <option value="finalize_batch">Finalizar lote energético</option>
                   <option
                     value="price"
                     disabled={community?.status !== "APPROVED"}
@@ -237,6 +246,25 @@ export default function GovernancePage() {
                   </option>
                 </select>
               </Field>
+              {action === "finalize_batch" && (
+                <>
+                  <Field label="UUID del lote energético">
+                    <input
+                      name="batch_id"
+                      defaultValue={params.get("batch") ?? ""}
+                      required
+                      pattern="[a-fA-F0-9-]{36}"
+                    />
+                  </Field>
+                  <Notice>
+                    Revisa el lote en Liquidación antes de aprobarlo. Debe estar
+                    en revisión y haber terminado su período de impugnación.
+                    Programa la operación y después ejecútala con la wallet de
+                    gobernanza. Una vez finalizado, el worker tramita la emisión
+                    SUN de los aportes elegibles sin exigir depósitos previos.
+                  </Notice>
+                </>
+              )}
               {["transition", "membership"].includes(action) && (
                 <Field label="Estado de destino">
                   <select name="status">
