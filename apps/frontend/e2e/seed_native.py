@@ -123,13 +123,13 @@ if __name__ == '__main__':
         artifacts[name] = json.loads((ROOT / 'contracts/out' / f'{name}.sol' / f'{name}.json').read_text())
     payload = 'ARTIFACTS=json.loads(' + repr(json.dumps(artifacts)) + ')\n' + SOURCE
     payload = 'import json\n' + payload
-    command = ['docker', 'compose', '-f', 'infrastructure/docker/compose.prototype.yml', 'exec', '-T', '-e', 'NO_PROXY=localhost,127.0.0.1,anvil,timescaledb,redis,mosquitto', '-e', 'no_proxy=localhost,127.0.0.1,anvil,timescaledb,redis,mosquitto', 'api', 'python', '-']
-    compose = ['docker', 'compose', '-f', 'infrastructure/docker/compose.prototype.yml']
+    compose = ['docker', 'compose', '--env-file', 'infrastructure/docker/.env', '-f', 'infrastructure/docker/compose.prototype.yml']
+    command = [*compose, 'exec', '-T', '-e', 'NO_PROXY=localhost,127.0.0.1,anvil,timescaledb,redis,mosquitto', '-e', 'no_proxy=localhost,127.0.0.1,anvil,timescaledb,redis,mosquitto', 'api', 'python', '-']
     subprocess.run([*compose, 'stop', 'worker'], cwd=ROOT, check=True, capture_output=True)
     try:
         result = subprocess.run(command, input=payload, text=True, capture_output=True, cwd=ROOT)
     finally:
-        subprocess.run(['docker', 'start', 'solar-prototype-worker-1'], cwd=ROOT, check=False, capture_output=True)
+        subprocess.run([*compose, 'start', 'worker'], cwd=ROOT, check=False, capture_output=True)
     if result.returncode:
         raise SystemExit(result.stderr[-6000:])
     data = json.loads(result.stdout.strip().splitlines()[-1])

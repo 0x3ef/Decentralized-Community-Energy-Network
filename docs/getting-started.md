@@ -139,3 +139,8 @@ These preserve persistent volumes. Preserve PostgreSQL and Anvil history togethe
 contract addresses and financial projections cannot safely survive an independent
 chain reset. Destructive cleanup is intentionally outside normal startup.
 Operational failures and Sepolia configuration belong in [deployment](deployment.md).
+
+If Anvil lost its contracts and no valid chain backup exists, use the
+[isolated local recovery workflow](deployment.md#recover-a-local-demo-after-lost-anvil-state).
+It preserves old data and creates a new demo with different credentials rather
+than silently reusing financial history.

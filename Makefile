@@ -5,7 +5,7 @@ DEV_TOOLS ?= $(ROOT_DIR)/.dev-tools
 COMPOSE_FILE := $(ROOT_DIR)/infrastructure/docker/compose.prototype.yml
 COMPOSE      := docker compose --env-file $(ROOT_DIR)/infrastructure/docker/.env -f $(COMPOSE_FILE)
 
-.PHONY: help setup up down logs ps build migrate seed test test-contracts test-iot \
+.PHONY: help setup recover-demo up down logs ps build migrate seed test test-contracts test-iot \
         test-backend lint format typecheck contracts-deploy clean
 
 help: ## Show this help
@@ -14,6 +14,9 @@ help: ## Show this help
 
 setup: ## Bootstrap the local environment
 	./scripts/setup.sh
+
+recover-demo: ## Archive a broken local demo and commission an isolated replacement
+	python scripts/recover_local_demo.py --new-demo
 
 up: ## Start the full stack
 	$(COMPOSE) up -d

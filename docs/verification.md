@@ -163,3 +163,34 @@ without recreating the publisher and delivered the next acknowledged telemetry
 message. Scoped Ruff, Compose configuration validation and whitespace checks passed.
 This verifies local transport recovery; it does not identify the cause of a remote
 user's broker disconnection or establish a new full financial scenario result.
+
+## Named-volume persistence and isolated recovery follow-up
+
+The earlier integration persistence probe used a host-directory bind mount. It
+passed that check but did not exercise a newly created Docker named volume. A
+subsequent reproduction found that `/state` was root-owned and unwritable by the
+Foundry image's UID 1000. RPC health alone therefore did not establish persistence.
+The one-off volume ownership initializer and state-file health condition now cover
+that actual deployment boundary.
+
+Executed for this correction:
+
+- A fresh uninitialized named volume reproduced the unwritable state directory.
+- The actual Compose initializer made a named volume writable; Anvil saved state
+  periodically. After SIGKILL, genesis, deployed contract bytecode, transaction
+  receipt and sender nonce were all preserved on restart.
+- The complete isolated recovery command archived an existing PostgreSQL database
+  and retained four original volumes. Its private dump was restored into a separate
+  disposable inspection database; 33 archived users remained readable. Private
+  archive/dump/settings permissions were checked.
+- The replacement demo verified all five deployed contracts across another Anvil
+  restart, then completed the actual MQTT/worker/native financial scenario:
+  5 kWh injection, 3 kWh allocation, 0.003 ETH earned/withdrawn and 3 SUN retired.
+- Three recovery safety tests passed: public configuration, public RPC endpoint,
+  and an intact registry all prevent replacement before infrastructure mutation.
+- Scoped Ruff, Compose validation, Markdown lint and whitespace checks passed.
+
+This is a new local demonstration, not restoration of the old chain's contracts,
+receipts or financial entitlements. No old financial rows were relabeled or imported
+as new balances. No full backend/frontend suite or public network acceptance was
+rerun as part of this infrastructure correction.
