@@ -4,10 +4,14 @@ Artifacts and a private output directory are mounted only for this one-off task.
 Existing user settings and unrelated data are preserved.
 """
 
+import argparse
 import json
 import os
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
+
+from dotenv import dotenv_values
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = [
@@ -30,13 +34,54 @@ def update(path, values):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--recommission",
+        action="store_true",
+        help="Replace missing unused local contracts on the SAME database",
+    )
+    args = parser.parse_args()
+    if args.recommission:
+        values = dotenv_values(ROOT / "infrastructure/docker/.env")
+        if values.get("ENVIRONMENT") != "development" or values.get("CHAIN_ID") not in (
+            "31337",
+            "1337",
+        ):
+            raise SystemExit(
+                "Repair requires the original local-development env file; no services were stopped"
+            )
     directory = ROOT / ".run/demo"
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     artifacts = ROOT / "contracts/out"
     if not (artifacts / "CommunityRegistry.sol/CommunityRegistry.json").exists():
         raise SystemExit("Compile contracts first: make contracts-build")
-    subprocess.run([*COMPOSE, "stop", "worker", "subscriber"], check=True, cwd=ROOT)
+    services = ["worker", "subscriber", *(["api"] if args.recommission else [])]
+    subprocess.run([*COMPOSE, "stop", *services], check=True, cwd=ROOT)
     try:
+        if args.recommission:
+            backup = directory / (
+                "sql-backup-" + datetime.now(UTC).strftime("%Y%m%d%H%M%S%f") + ".dump"
+            )
+            fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as output:
+                subprocess.run(
+                    [
+                        *COMPOSE,
+                        "exec",
+                        "-T",
+                        "timescaledb",
+                        "pg_dump",
+                        "-U",
+                        "solar",
+                        "-d",
+                        "solar",
+                        "-Fc",
+                    ],
+                    stdout=output,
+                    check=True,
+                    cwd=ROOT,
+                )
+            print(f"Private database backup created: {backup}", flush=True)
         subprocess.run(
             [
                 *COMPOSE,
@@ -53,7 +98,9 @@ def main():
                 "api",
                 "python",
                 "-m",
-                "src.protocol.bootstrap",
+                "src.protocol.recommission"
+                if args.recommission
+                else "src.protocol.bootstrap",
             ],
             check=True,
             cwd=ROOT,

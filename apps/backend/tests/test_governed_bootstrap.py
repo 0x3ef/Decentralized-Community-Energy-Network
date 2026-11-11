@@ -1,4 +1,3 @@
-
 """Real MQTT -> SQLModel -> native allocation/settlement -> burn/withdrawal."""
 
 import asyncio
@@ -15,14 +14,22 @@ from sqlmodel import select
 from src.core.config import Config
 from src.core.db import AsyncSessionFactory
 from src.iot.mqtt_handler import MqttIngestWorker
+from src.modules.auth.models import User
 from src.modules.community.models import ChainOperation
 from src.modules.device.models import Device, TelemetryAssessment, TelemetryMessage
 from src.modules.energy.models import EnergyCredit, OutboxEvent
 from src.modules.energy.processor import EnergyProcessor
+from src.modules.home.models import Home
 from src.modules.settlement.chain import NativeSettlementChain, binary
-from src.modules.settlement.models import IntervalAllocation, SettlementClaim
+from src.modules.settlement.models import (
+    IndexedNativeEvent,
+    IntervalAllocation,
+    NativeSyncCursor,
+    SettlementClaim,
+)
 from src.protocol.bootstrap import bootstrap
 from src.protocol.deployment import Deployment, artifacts_at
+from src.protocol.recommission import recommission
 from web3 import Web3
 from web3.exceptions import ContractLogicError
 
@@ -57,7 +64,112 @@ async def test_governed_bootstrap_mqtt_native_lifecycle_is_idempotent(
         demo == again
         and w3.eth.get_transaction_count(demo["governance"]["address"]) == nonce
     )
+    # Keep the existing database when only unused local contracts disappeared.
     cid = UUID(demo["community_id"])
+    async with AsyncSessionFactory() as db:
+        await NativeSettlementChain(w3).index_native(db, cid)
+        await db.commit()
+        governance_ids = list(
+            (
+                await db.exec(
+                    select(IndexedNativeEvent.id).where(
+                        IndexedNativeEvent.community_id == cid
+                    )
+                )
+            ).all()
+        )
+        assert governance_ids
+    async with AsyncSessionFactory() as db:
+        home = await db.get(Home, UUID(demo["members"][2]["home_id"]))
+        home.address = "Preserved existing address"
+        weather = (
+            await db.exec(
+                select(Device).where(
+                    Device.home_id == home.id, Device.device_type == "weather_sensor"
+                )
+            )
+        ).one()
+        history = TelemetryMessage(
+            device_id=weather.id,
+            sequence_number=999,
+            measured_at=datetime.now(UTC),
+            payload={"historical_audit": "retain verbatim"},
+            quality_status="invalid",
+        )
+        db.add(history)
+        user = await db.get(User, UUID(demo["members"][0]["user_id"]))
+        original_password_hash = user.password_hash
+        cursor = await db.get(NativeSyncCursor, cid)
+        cursor.block_number = 77
+        cursor.block_hash = "0x" + "1" * 64
+        await db.commit()
+        history_id = history.id
+    with pytest.raises(ValueError, match="Registry still exists"):
+        await recommission(
+            AsyncSessionFactory,
+            w3,
+            artifacts,
+            tmp_path,
+            "local-only-password",
+            "local-device-key-" + "x" * 40,
+        )
+    old_registry = demo["registry"]
+    w3.provider.make_request("anvil_setCode", [old_registry, "0x"])
+    nonce_before_repair = w3.eth.get_transaction_count(demo["governance"]["address"])
+    with pytest.raises(ValueError, match="original SEED_PASSWORD"):
+        await bootstrap(
+            AsyncSessionFactory,
+            w3,
+            artifacts,
+            tmp_path,
+            "wrong-local-password",
+            "local-device-key-" + "x" * 40,
+            recommission=True,
+        )
+    with pytest.raises(ValueError, match="original SEED_DEVICE_KEY"):
+        await bootstrap(
+            AsyncSessionFactory,
+            w3,
+            artifacts,
+            tmp_path,
+            "local-only-password",
+            "different-local-device-key-" + "y" * 40,
+            recommission=True,
+        )
+    assert (
+        w3.eth.get_transaction_count(demo["governance"]["address"])
+        == nonce_before_repair
+    )
+    assert len(list((tmp_path / "wallets").glob("*.json"))) == 6
+    demo = await recommission(
+        AsyncSessionFactory,
+        w3,
+        artifacts,
+        tmp_path,
+        "local-only-password",
+        "local-device-key-" + "x" * 40,
+    )
+    assert demo["registry"] != old_registry
+    async with AsyncSessionFactory() as db:
+        assert (
+            await db.get(Home, UUID(demo["members"][2]["home_id"]))
+        ).address == "Preserved existing address"
+        assert (await db.get(TelemetryMessage, history_id)).payload == {
+            "historical_audit": "retain verbatim"
+        }
+        assert (
+            await db.get(User, UUID(demo["members"][0]["user_id"]))
+        ).password_hash == original_password_hash
+        cursor = await db.get(NativeSyncCursor, cid)
+        assert cursor.block_number == -1 and cursor.block_hash is None
+        for event_id in governance_ids:
+            assert not (await db.get(IndexedNativeEvent, event_id)).canonical
+    archives = list(tmp_path.glob("recommission-*"))
+    assert len(archives) == 1
+    assert (
+        json.loads((archives[0] / "old-binding.json").read_text())["registry"]
+        == old_registry
+    )
     a, b = demo["members"][:2]
     c = {
         name: w3.eth.contract(address=demo[key], abi=artifacts[name]["abi"])
@@ -310,3 +422,22 @@ async def test_governed_bootstrap_mqtt_native_lifecycle_is_idempotent(
         assert (await db.get(OutboxEvent, job_id)).status == "FAILED"
         assert (await db.get(ChainOperation, operation_id)).status == "BLOCKED"
     assert sun.functions.totalSupply().call() == 2 * 10**18
+
+    # Financial activity must never be rebound to a new deployment.
+    registry_code = w3.eth.get_code(demo["registry"])
+    w3.provider.make_request("anvil_setCode", [demo["registry"], "0x"])
+    try:
+        with pytest.raises(ValueError, match="Financial/history records exist"):
+            await recommission(
+                AsyncSessionFactory,
+                w3,
+                artifacts,
+                tmp_path,
+                "local-only-password",
+                "local-device-key-" + "x" * 40,
+            )
+        assert len(list(tmp_path.glob("recommission-*"))) == 1
+    finally:
+        w3.provider.make_request(
+            "anvil_setCode", [demo["registry"], Web3.to_hex(registry_code)]
+        )
