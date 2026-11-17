@@ -3,7 +3,9 @@ FROM python:3.12-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/app
 WORKDIR /app
 COPY apps/backend/requirements.txt apps/backend/requirements.lock ./
-RUN --mount=type=secret,id=proxy_ca \
+# BuildKit is required for this optional secret mount; omit the secret to use
+# the image's system trust store.
+RUN --mount=type=secret,id=proxy_ca,required=false \
     if [ -f /run/secrets/proxy_ca ]; then export PIP_CERT=/run/secrets/proxy_ca; fi; \
     pip install --no-cache-dir -r requirements.lock
 COPY apps/backend/ ./
@@ -21,7 +23,7 @@ FROM base AS worker
 USER 1000:1000
 CMD ["python", "-m", "src.workers.community_worker"]
 FROM base AS tests
-RUN --mount=type=secret,id=proxy_ca \
+RUN --mount=type=secret,id=proxy_ca,required=false \
     if [ -f /run/secrets/proxy_ca ]; then export PIP_CERT=/run/secrets/proxy_ca; fi; \
     pip install --no-cache-dir pytest pytest-asyncio httpx
 CMD ["python", "-m", "pytest"]

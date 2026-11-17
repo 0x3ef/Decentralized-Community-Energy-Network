@@ -1,13 +1,22 @@
-# Optional loopback-only password+ACL broker; use TLS for untrusted networks.
+# Optional loopback-only password+ACL broker; use with compose.iot.yml for simulation.
 services:
   mosquitto:
-    # Subscriber heartbeat verifies actual authenticated MQTT connectivity.
+    environment:
+      MQTT_SUBSCRIBER_PASSWORD: ${MQTT_SUBSCRIBER_PASSWORD:?Set the subscriber broker password}
     healthcheck:
-      test: [CMD-SHELL, "pidof mosquitto >/dev/null"]
+      test: [CMD-SHELL, "mosquitto_sub -h 127.0.0.1 -p 1883 -u solar-subscriber -P \"$$MQTT_SUBSCRIBER_PASSWORD\" -t '$$SYS/broker/version' -C 1 -W 4 >/dev/null"]
       interval: 10s
-      timeout: 3s
+      timeout: 5s
       retries: 10
     volumes:
       - ./mosquitto/secure/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ${MQTT_PASSWORD_FILE:?Set a provisioned Mosquitto password file}:/run/mqtt/passwords:ro
       - ${MQTT_ACL_FILE:?Set a provisioned per-device ACL file}:/run/mqtt/acl:ro
+    ports:
+      - "127.0.0.1:1883:1883"
+  subscriber:
+    environment:
+      MQTT_PORT: 1883
+      MQTT_USERNAME: solar-subscriber
+      MQTT_PASSWORD: ${MQTT_SUBSCRIBER_PASSWORD:?Set the subscriber broker password}
+      MQTT_TLS_CA: ""

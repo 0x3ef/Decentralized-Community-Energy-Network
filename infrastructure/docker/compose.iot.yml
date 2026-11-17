@@ -28,6 +28,10 @@ services:
       - ${SIMULATOR_CATALOGUE_FILE:?Set the path to the approved home catalogue}:/run/simulation/home-catalogue.json:ro
       - simulation_state:/state
       - ${SIMULATOR_CA_FILE:-/etc/ssl/certs/ca-certificates.crt}:/run/simulation/ca.crt:ro
-    depends_on: [mosquitto, subscriber]
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      subscriber:
+        condition: service_healthy
 volumes:
   simulation_state:

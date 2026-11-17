@@ -6,7 +6,7 @@ OUT_DIR    := grpc_client
 PROTO_FILE := $(PROTO_DIR)/sensor.proto
 
 # Path to the compose file (relative to iot/)
-COMPOSE    := docker compose -f ../infrastructure/docker/docker-compose.yml
+COMPOSE    := docker compose -f ../infrastructure/docker/compose.prototype.yml
 
 .PHONY: help install protos clean-protos \
         test test-unit test-integration test-all test-cov \

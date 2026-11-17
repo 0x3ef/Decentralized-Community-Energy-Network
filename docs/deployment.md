@@ -32,9 +32,8 @@ seconds with historical states preserved. Back up SQL journals and EVM state
 together. Redis has no persistent volume in this prototype; its loss can remove
 revocation/heartbeat state. Simulation uses an additional checkpoint volume.
 
-The older `infrastructure/docker/docker-compose.yml` remains a legacy artifact
-with differing ports, secrets, gRPC routing and frontend variables. Do not combine
-it with this guide or use it as the canonical installation command.
+The older `infrastructure/docker/docker-compose.yml` has been removed. Use
+`compose.prototype.yml` as the sole base and add only the documented overlays.
 
 ## Builds and routine commands
 

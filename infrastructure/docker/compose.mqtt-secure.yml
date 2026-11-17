@@ -1,11 +1,13 @@
-# Overlay compose.prototype.yml after provisioning broker users, ACLs and TLS.
+# Overlay compose.prototype.yml (and compose.iot.yml when simulating) after
+# provisioning broker users, ACLs and TLS.
 services:
   mosquitto:
-    # Subscriber heartbeat verifies actual authenticated MQTT connectivity.
+    environment:
+      MQTT_SUBSCRIBER_PASSWORD: ${MQTT_SUBSCRIBER_PASSWORD:?Set the subscriber broker password}
     healthcheck:
-      test: [CMD-SHELL, "pidof mosquitto >/dev/null"]
+      test: [CMD-SHELL, "mosquitto_sub --cafile /run/mqtt/tls/ca.crt -h 127.0.0.1 -p 8883 -u solar-subscriber -P \"$$MQTT_SUBSCRIBER_PASSWORD\" -t '$$SYS/broker/version' -C 1 -W 4 >/dev/null"]
       interval: 10s
-      timeout: 3s
+      timeout: 5s
       retries: 10
     volumes:
       - ./mosquitto/secure/mosquitto-tls.conf:/mosquitto/config/mosquitto.conf:ro

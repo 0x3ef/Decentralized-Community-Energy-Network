@@ -24,6 +24,7 @@ jobs:
       - name: Build and start integrated Docker services
         run: |
           source .venv/bin/activate
+          bash ./scripts/validate_docker.sh
           make setup
           make demo
           curl -fsS http://127.0.0.1:8000/ready

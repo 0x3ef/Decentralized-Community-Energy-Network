@@ -42,7 +42,8 @@ An empty default means the capability is unconfigured.
 | Variable | Default / format | Requirement and purpose |
 | --- | --- | --- |
 | `ENVIRONMENT` | `development`, string | Local bootstrap requires development; production rejects local chain IDs |
-| `DATABASE_URL` | `postgresql+asyncpg://solar:solar@localhost:5432/solar` | Async PostgreSQL DSN; Compose overrides host to `timescaledb` and uses local fixture credentials |
+| `DATABASE_URL` | Empty in local templates | Async PostgreSQL DSN; the container entrypoint derives the internal `timescaledb` URL from `POSTGRES_*` values |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | `solar`, generated, `solar` | Compose database credentials; the local generator creates a fresh password |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis URI; Compose uses `redis`; revocation, heartbeats and optional mail broker |
 | `JWT_SECRET` | No default; 32+ characters | Required in every backend process, including migrations |
 | `JWT_ALGORITHM` | `HS256` | JWT signing/verification algorithm |
@@ -182,8 +183,8 @@ public JSON or checkpoint files.
 | `MQTT_TLS_DIRECTORY`, `MQTT_SUBSCRIBER_PASSWORD` | Required for TLS overlay | Broker certificate directory and subscriber credential |
 
 Authenticated overlays also set subscriber identity/TLS environment explicitly.
-The prototype hardcodes its local PostgreSQL credentials; `POSTGRES_PASSWORD` in
-an unrelated legacy Compose file does not configure the canonical stack.
+The canonical prototype stack takes PostgreSQL credentials from the environment;
+the local generator creates them in the ignored `infrastructure/docker/.env`.
 `NO_PROXY` and `no_proxy` include internal Docker names/loopback; inherited external
 proxy variables and certificate verification stay enabled.
 
@@ -199,5 +200,5 @@ proxy variables and certificate verification stay enabled.
 
 Vite loads these at development start/build time. Docker forwards selected public
 build arguments; changing runtime `.env` cannot rewrite already-built JavaScript.
-`VITE_API_BASE_URL` belongs to the obsolete Compose file and is not the active
-frontend setting. Always rebuild after changing public deployment configuration.
+Always use `VITE_API_URL` and rebuild after changing public deployment
+configuration.

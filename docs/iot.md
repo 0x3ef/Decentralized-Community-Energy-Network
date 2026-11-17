@@ -179,7 +179,10 @@ mosquitto_passwd utility for the corresponding principals; the script handles no
 passwords. Set MQTT_USERNAME and MQTT_CLIENT_ID consistently so the principal's
 last-will topic is also permitted.
 
+`compose.mqtt-auth.yml` adds loopback-only password/ACL authentication.
 `compose.mqtt-secure.yml` overlays the prototype with an authenticated TLS listener.
+When running the simulator, include `compose.iot.yml` before either MQTT overlay so
+the simulator service is defined.
 Provide MQTT_PASSWORD_FILE, MQTT_ACL_FILE, MQTT_TLS_DIRECTORY (ca.crt/server.crt/
 server.key), and MQTT_SUBSCRIBER_PASSWORD through the operator's private environment.
 Mounted files must be readable by the broker's UID; do not put keys or passwords in

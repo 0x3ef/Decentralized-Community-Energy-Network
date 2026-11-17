@@ -8,9 +8,10 @@ from eth_account import Account
 root = Path(__file__).resolve().parents[1]
 target = root / "infrastructure" / "docker" / ".env"
 body = (
-    (root / ".env.example")
+    (root / "infrastructure" / "docker" / ".env.example")
     .read_text()
     .replace("JWT_SECRET=\n", "JWT_SECRET=" + secrets.token_urlsafe(48) + "\n")
+    .replace("POSTGRES_PASSWORD=\n", "POSTGRES_PASSWORD=" + secrets.token_urlsafe(24) + "\n")
     .replace(
         "BACKEND_PRIVATE_KEY=\n",
         "BACKEND_PRIVATE_KEY=" + Account.create().key.hex() + "\n",
