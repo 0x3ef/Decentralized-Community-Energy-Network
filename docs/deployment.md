@@ -100,6 +100,7 @@ MQTT connectivity.
 | Symptom | Investigation and response |
 | --- | --- |
 | Migration failure | Read the dedicated service error; verify schema revision and database access; never stamp or regenerate schema to hide a conflict |
+| `InvalidPasswordError` during migration | Restore the original database credentials in `infrastructure/docker/.env` DATABASE_URL; container startup preserves them and changes only host/port. POSTGRES_PASSWORD initializes new volumes only; do not delete an existing volume or regenerate credentials |
 | `/ready` 503 | Identify missing/degraded DB, Redis, RPC, worker or subscriber; liveness alone does not establish processing |
 | RPC 403 or wrong chain | Check authorized network route, CA, proxy exclusions and chain ID; this is not a confirmed settlement |
 | No device telemetry | Check commissioned public/internal UUIDs, active source/member/node/meter bindings, credential, exact topic ACL and broker TLS |

@@ -15,7 +15,10 @@ x-backend: &backend
   volumes:
     - ${CLOUD_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}:/run/runtime-ca.pem:ro
   environment: &environment
-    DATABASE_URL: postgresql+asyncpg://solar:solar@timescaledb:5432/solar
+    DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://solar:solar@localhost:5432/solar}
+    # Keep the original DB credentials; only adapt the endpoint inside Docker.
+    DATABASE_HOST_OVERRIDE: timescaledb
+    DATABASE_PORT_OVERRIDE: '5432'
     REDIS_URL: redis://redis:6379/0
     WEB3_PROVIDER_URL: http://anvil:8545
     MQTT_HOST: mosquitto
@@ -34,7 +37,8 @@ services:
     image: timescale/timescaledb:2.17.2-pg16
     environment:
       POSTGRES_USER: solar
-      POSTGRES_PASSWORD: solar
+      # Applies only when initializing an empty volume; never rotates an existing role.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-solar}
       POSTGRES_DB: solar
     volumes: [postgres:/var/lib/postgresql/data]
     restart: unless-stopped

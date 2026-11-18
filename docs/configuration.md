@@ -26,7 +26,7 @@ container database/Redis/RPC/MQTT hostnames, so changing host-oriented defaults 
 settings. It still inherits the local backend env-file surface: isolate the public
 runtime, configure its service environment deliberately, and check effective values
 without printing secrets. The overlay does not provision a hardened public broker
-or change the prototype's fixed local database credentials.
+or rotate the password of an existing PostgreSQL role.
 
 JWT secrets, signing keys, device credentials, wallet keystores, bearer tokens and
 authenticated RPC URLs are private. Keep ignored files access-controlled; every
@@ -42,7 +42,9 @@ An empty default means the capability is unconfigured.
 | Variable | Default / format | Requirement and purpose |
 | --- | --- | --- |
 | `ENVIRONMENT` | `development`, string | Local bootstrap requires development; production rejects local chain IDs |
-| `DATABASE_URL` | `postgresql+asyncpg://solar:solar@localhost:5432/solar` | Async PostgreSQL DSN; Compose overrides host to `timescaledb` and uses local fixture credentials |
+| `DATABASE_URL` | `postgresql+asyncpg://solar:solar@localhost:5432/solar` | Original async PostgreSQL DSN; Compose preserves credentials, database and query options, adapting only the internal endpoint |
+| `POSTGRES_PASSWORD` | `solar` | Initial role password for a NEW Compose database volume; must match the decoded password in DATABASE_URL; changing it does not rotate an existing role |
+| `DATABASE_HOST_OVERRIDE`, `DATABASE_PORT_OVERRIDE` | `timescaledb`, `5432` in Compose | Entrypoint adapts the original URL to the container endpoint before migrations or application startup; standalone commands keep their original URL |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis URI; Compose uses `redis`; revocation, heartbeats and optional mail broker |
 | `JWT_SECRET` | No default; 32+ characters | Required in every backend process, including migrations |
 | `JWT_ALGORITHM` | `HS256` | JWT signing/verification algorithm |
@@ -182,8 +184,10 @@ public JSON or checkpoint files.
 | `MQTT_TLS_DIRECTORY`, `MQTT_SUBSCRIBER_PASSWORD` | Required for TLS overlay | Broker certificate directory and subscriber credential |
 
 Authenticated overlays also set subscriber identity/TLS environment explicitly.
-The prototype hardcodes its local PostgreSQL credentials; `POSTGRES_PASSWORD` in
-an unrelated legacy Compose file does not configure the canonical stack.
+The prototype defaults to a local `solar` database and user. Existing volumes keep
+their original password: restore the original `DATABASE_URL` in the canonical
+private env file. URI-encode reserved password characters in that URL. Do not
+change the role password or recreate a volume to resolve a configuration mismatch.
 `NO_PROXY` and `no_proxy` include internal Docker names/loopback; inherited external
 proxy variables and certificate verification stay enabled.
 

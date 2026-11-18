@@ -419,3 +419,92 @@ def test_database_scenario_uses_original_api_and_keeps_credentials_off_command_l
         assert "private-test-credential" not in str(error.value)
     else:
         assert module.insert_database(messages) == {"inserted": 6, "duplicates": 0}
+
+
+def test_container_database_url_preserves_encoded_credentials_database_and_options():
+    from sqlalchemy.engine import URL, make_url
+    from src.core.docker_database import database_url
+
+    password = "private-test@:/#% password"
+    original = URL.create(
+        "postgresql+asyncpg",
+        username="solar",
+        password=password,
+        host="localhost",
+        port=55432,
+        database="retained_database",
+        query={"application_name": "existing-worker"},
+    )
+    adapted = make_url(
+        database_url(
+            {
+                "DATABASE_URL": original.render_as_string(hide_password=False),
+                "DATABASE_HOST_OVERRIDE": "timescaledb",
+                "DATABASE_PORT_OVERRIDE": "5432",
+            }
+        )
+    )
+    assert adapted.password == password
+    assert adapted.username == original.username
+    assert adapted.database == original.database
+    assert adapted.query == original.query
+    assert adapted.host == "timescaledb" and adapted.port == 5432
+
+
+@pytest.mark.parametrize(
+    "url", ["private-test-invalid-url", "sqlite:///private-test-secret"]
+)
+def test_container_database_url_failure_does_not_print_credentials(url):
+    from src.core.docker_database import database_url
+
+    with pytest.raises(ValueError) as error:
+        database_url({"DATABASE_URL": url, "DATABASE_HOST_OVERRIDE": "timescaledb"})
+    assert "private-test" not in str(error.value)
+
+
+@pytest.mark.parametrize("override", [True, False])
+def test_actual_entrypoint_preserves_private_database_password(monkeypatch, override):
+    import os
+    import sys
+
+    from sqlalchemy.engine import URL
+
+    root = Path(__file__).resolve().parents[3]
+    password = "private-test@:/#% password"
+    original = URL.create(
+        "postgresql+asyncpg",
+        username="solar",
+        password=password,
+        host="localhost",
+        port=55432,
+        database="retained_database",
+    )
+    environment = os.environ.copy()
+    environment.update(
+        DATABASE_URL=original.render_as_string(hide_password=False),
+        TEST_EXPECTED_DB_PASSWORD=password,
+        PYTHONPATH=str(root / "apps/backend"),
+        PATH=str(Path(sys.executable).parent) + os.pathsep + environment["PATH"],
+        RUN_MIGRATIONS="false",
+    )
+    for key in ("DATABASE_HOST_OVERRIDE", "DATABASE_PORT_OVERRIDE"):
+        environment.pop(key, None)
+    if override:
+        environment.update(
+            DATABASE_HOST_OVERRIDE="timescaledb", DATABASE_PORT_OVERRIDE="5432"
+        )
+    check = (
+        "import os; from sqlalchemy.engine import make_url; u=make_url(os.environ['DATABASE_URL']); assert u.password == os.environ['TEST_EXPECTED_DB_PASSWORD']; assert u.host == "
+        + repr("timescaledb" if override else "localhost")
+        + "; assert u.database == 'retained_database'"
+    )
+    result = subprocess.run(
+        ["sh", str(root / "scripts/entry_point.sh"), sys.executable, "-c", check],
+        env=environment,
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode == 0, (
+        "Entrypoint failed to preserve original DB credentials"
+    )
+    assert "private-test" not in result.stdout + result.stderr
