@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, session } from "../../shared/api/client";
+import { api, session, ApiError } from "../../shared/api/client";
 import type { UserMeModel } from "../../shared/api/models";
 interface Auth {
   user: UserMeModel | null;
@@ -24,48 +24,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const recover = useCallback(async () => {
     await Promise.resolve();
+    const version = session.version();
     if (session.access()) {
       try {
-        setUser(await api<UserMeModel>("/auth/me"));
-      } catch {
-        session.clear();
-        setUser(null);
+        const recovered = await api<UserMeModel>("/auth/me");
+        if (session.version() === version) setUser(recovered);
+      } catch (error) {
+        if (
+          session.version() === version &&
+          error instanceof ApiError &&
+          [401, 403].includes(error.status)
+        )
+          session.clear();
       }
     }
-    setLoading(false);
+    if (session.version() === version || !session.access()) setLoading(false);
   }, []);
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- Asynchronous bootstrap synchronizes the external bearer session.
     void recover();
     const clear = () => {
       setUser(null);
+      setLoading(false);
       client.clear();
     };
     window.addEventListener("solar:logout", clear);
     return () => window.removeEventListener("solar:logout", clear);
   }, [client, recover]);
   async function login(email: string, password: string) {
+    session.clear();
+    const pendingVersion = session.version();
     const tokens = await api<{ access_token: string; refresh_token: string }>(
       "/auth/login",
       { method: "POST", body: { email, password }, public: true },
     );
+    if (session.version() !== pendingVersion) return;
     session.save(tokens.access_token, tokens.refresh_token);
+    const version = session.version();
     try {
-      setUser(await api<UserMeModel>("/auth/me"));
-      setLoading(false);
+      const authenticated = await api<UserMeModel>("/auth/me");
+      if (session.version() === version) {
+        setUser(authenticated);
+        setLoading(false);
+      }
     } catch (error) {
-      session.clear();
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (session.version() === version) session.clear();
       throw error;
     }
   }
   async function logout() {
-    try {
-      await api("/auth/logout");
-    } finally {
-      session.clear();
-      setUser(null);
-      client.clear();
-    }
+    const revocation = api("/auth/logout", {}, false);
+    session.clear();
+    // Local logout must finish even when remote revocation is unavailable.
+    await revocation.catch(() => undefined);
   }
   return (
     <Context.Provider value={{ user, loading, login, logout, recover }}>

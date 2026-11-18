@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, status, BackgroundTasks
 from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from src.core.db import get_session
 from src.core.redis import add_jti_to_blocklist
@@ -11,7 +12,6 @@ from src.core.redis import add_jti_to_blocklist
 from .dependencies import (
     AccessTokenBearer,
     RefreshTokenBearer,
-    RoleChecker,
     get_current_user,
 )
 from .schemas import (
@@ -36,7 +36,6 @@ from src.core.celery_tasks import send_email
 
 auth_router = APIRouter()
 user_service = UserService()
-role_checker = RoleChecker(["admin", "user"])
 
 
 REFRESH_TOKEN_EXPIRY = 2
@@ -78,7 +77,9 @@ async def login_users(
     user = await user_service.get_user_by_email(email, session)
 
     if user is not None:
-        password_valid = verify_password(password, user.password_hash)
+        password_valid = await run_in_threadpool(
+            verify_password, password, user.password_hash
+        )
 
         if password_valid:
             access_token = create_access_token(
@@ -121,7 +122,7 @@ async def get_new_access_token(token_details: dict = Depends(RefreshTokenBearer(
 
 @auth_router.get("/me", response_model=UserMeModel)
 async def get_current_user(
-    user=Depends(get_current_user), _: bool = Depends(role_checker)
+    user=Depends(get_current_user),
 ):
     return user
 
@@ -185,7 +186,7 @@ async def reset_account_password(
         if not user:
             raise UserNotFound()
 
-        passwd_hash = generate_passwd_hash(new_password)
+        passwd_hash = await run_in_threadpool(generate_passwd_hash, new_password)
         await user_service.update_user(user, {"password_hash": passwd_hash}, session)
 
         return JSONResponse(

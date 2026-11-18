@@ -14,6 +14,7 @@ export function useApi<T>(path: string, enabled = true, poll = false) {
     refetchInterval: poll ? 30_000 : false,
     retry: (count, error) =>
       count < 1 &&
+      !(error instanceof DOMException && error.name === "AbortError") &&
       !(
         error instanceof Error &&
         "status" in error &&

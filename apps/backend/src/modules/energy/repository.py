@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import func
+from sqlalchemy.orm import raiseload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -21,10 +22,11 @@ class EnergyRepository:
     ) -> list[EnergyInterval]:
         result = await session.exec(
             select(EnergyInterval)
+            .options(raiseload("*"))
             .where(
                 EnergyInterval.home_id == home_id,
                 EnergyInterval.interval_start >= start,
-                EnergyInterval.interval_end <= end,
+                EnergyInterval.interval_start < end,
             )
             .order_by(EnergyInterval.interval_start)
         )
@@ -41,20 +43,17 @@ class EnergyRepository:
             EnergyInterval.grid_export_wh,
             EnergyInterval.eligible_export_wh,
         )
-        values = []
-        for column in columns:
-            value = await session.exec(
-                select(func.coalesce(func.sum(column), 0)).where(
-                    EnergyInterval.home_id == home_id,
-                    EnergyInterval.interval_start >= start,
-                    EnergyInterval.interval_end <= end,
-                )
+        result = await session.exec(
+            select(*(func.coalesce(func.sum(column), 0) for column in columns)).where(
+                EnergyInterval.home_id == home_id,
+                EnergyInterval.interval_start >= start,
+                EnergyInterval.interval_start < end,
             )
-            values.append(int(value.one()))
+        )
         return dict(zip(
             ("generation_wh", "consumption_wh", "grid_import_wh",
              "grid_export_wh", "eligible_export_wh"),
-            values,
+            (int(value) for value in result.one()),
         ))
 
     async def list_credits(
@@ -62,6 +61,7 @@ class EnergyRepository:
     ) -> list[EnergyCredit]:
         result = await session.exec(
             select(EnergyCredit)
+            .options(raiseload("*"))
             .where(EnergyCredit.owner_id == owner_id)
             .order_by(EnergyCredit.created_at.desc())
         )
@@ -70,7 +70,12 @@ class EnergyRepository:
     async def get_credit(
         self, session: AsyncSession, credit_id: UUID
     ) -> EnergyCredit | None:
-        return await session.get(EnergyCredit, credit_id)
+        result = await session.exec(
+            select(EnergyCredit)
+            .where(EnergyCredit.id == credit_id)
+            .options(raiseload("*"))
+        )
+        return result.first()
 
     async def approve_credit(
         self, session: AsyncSession, credit: EnergyCredit

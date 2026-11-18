@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
+from sqlalchemy.orm import raiseload
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.modules.energy.repository import EnergyRepository
@@ -20,7 +22,10 @@ class EnergyService:
     async def _ensure_home_access(
         self, session: AsyncSession, user, home_id: UUID
     ) -> Home:
-        home = await session.get(Home, home_id)
+        result = await session.exec(
+            select(Home).where(Home.id == home_id).options(raiseload("*"))
+        )
+        home = result.first()
         if home is None:
             raise LookupError("Home not found")
         if home.owner_id != user.uid and user.role not in ("admin", "operator"):

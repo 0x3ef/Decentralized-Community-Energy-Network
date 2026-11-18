@@ -1,5 +1,7 @@
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.orm import raiseload
+from starlette.concurrency import run_in_threadpool
 
 from .models import User
 
@@ -9,7 +11,7 @@ from .utils import generate_passwd_hash
 
 class UserService:
     async def get_user_by_email(self, email: str, session: AsyncSession):
-        statement = select(User).where(User.email == email)
+        statement = select(User).where(User.email == email).options(raiseload("*"))
 
         result = await session.exec(statement)
 
@@ -27,7 +29,9 @@ class UserService:
 
         new_user = User(**user_data_dict)
 
-        new_user.password_hash = generate_passwd_hash(user_data_dict["password"])
+        new_user.password_hash = await run_in_threadpool(
+            generate_passwd_hash, user_data_dict["password"]
+        )
         new_user.role = "user"
 
         session.add(new_user)

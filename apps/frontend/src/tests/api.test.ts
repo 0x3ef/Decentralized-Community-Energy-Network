@@ -5,6 +5,11 @@ const json = (data: unknown, status = 200) =>
     status,
     headers: { "Content-Type": "application/json" },
   });
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((done) => { resolve = done; });
+  return { promise, resolve };
+}
 beforeEach(() => sessionStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 describe("API adapter", () => {
@@ -63,5 +68,47 @@ describe("API adapter", () => {
     await expect(api("/auth/me")).rejects.toBeInstanceOf(ApiError);
     expect(session.access()).toBeNull();
     expect(session.refresh()).toBeNull();
+  });
+  it("retains tokens when the refresh service is temporarily unavailable", async () => {
+    session.save("expired", "valid-refresh");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      json({}, String(input).endsWith("/auth/refresh_token") ? 503 : 401),
+    );
+    await expect(api("/private")).rejects.toMatchObject({ status: 503 });
+    expect(session.access()).toBe("expired");
+    expect(session.refresh()).toBe("valid-refresh");
+  });
+  it.each([200, 401])("ignores a previous account's delayed refresh (%s)", async (status) => {
+    session.save("old-access", "old-refresh");
+    let finishRefresh!: (response: Response) => void;
+    const started = deferred<void>();
+    const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input).endsWith("/auth/refresh_token")) {
+        started.resolve();
+        return new Promise<Response>((resolve) => { finishRefresh = resolve; });
+      }
+      return json({}, 401);
+    });
+    const old = api("/private").catch((error: unknown) => error);
+    await started.promise;
+    session.clear();
+    session.save("new-access", "new-refresh");
+    finishRefresh(json({ access_token: "old-renewed" }, status));
+    expect(await old).toMatchObject({ name: "AbortError" });
+    expect(session.access()).toBe("new-access");
+    expect(session.refresh()).toBe("new-refresh");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it("does not refresh or return data from requests belonging to a previous account", async () => {
+    session.save("old-access", "old-refresh");
+    const response = deferred<Response>();
+    const fetcher = vi.spyOn(globalThis, "fetch").mockReturnValue(response.promise);
+    const old = api("/private").catch((error: unknown) => error);
+    session.clear();
+    session.save("new-access", "new-refresh");
+    response.resolve(json({ private: "old-user-data" }));
+    expect(await old).toMatchObject({ name: "AbortError" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(session.access()).toBe("new-access");
   });
 });
