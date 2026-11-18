@@ -87,9 +87,9 @@ async def run():
   db.add(NativeDeployment(community_id=cid,chain_id=31337,sun_address=sun.address,settlement_address=settlement.address,vault_address=vault.address));await db.commit()
   end=datetime.now(UTC).replace(second=0,microsecond=0);end=end.replace(minute=end.minute//15*15)-timedelta(minutes=15);start=end-timedelta(minutes=15)
   messages=[]
-  for seq,at in ((1,start),(2,end)):
+  for seq,at,f in ((1,start,0),(2,end-timedelta(seconds=1),1),(3,end,1)):
    for index,meter in enumerate(meters):
-    f=seq-1;messages.append({'schema_version':'2.0','message_id':str(uuid4()),'community_id':str(cid),'node_id':str(nodes[index].id),'source':'SIMULATED','simulation_mode':'REALTIME','units':{'grid_export_energy_kwh':'kWh','grid_import_energy_kwh':'kWh','consumption_energy_kwh':'kWh'},'device_id':str(meter.device_id),'home_id':str(meter.home_id),'sensor_type':'smart_meter','sequence_number':seq,'measured_at':at.isoformat(),'credential':'frontend-fixture-credential','data':{'grid_export_energy_kwh':5*f if index==0 else 0,'grid_import_energy_kwh':3*f if index==1 else 0,'consumption_energy_kwh':3*f if index==1 else 0}})
+    messages.append({'schema_version':'2.0','message_id':str(uuid4()),'community_id':str(cid),'node_id':str(nodes[index].id),'source':'SIMULATED','simulation_mode':'REALTIME','units':{'grid_export_energy_kwh':'kWh','grid_import_energy_kwh':'kWh','consumption_energy_kwh':'kWh'},'device_id':str(meter.device_id),'home_id':str(meter.home_id),'sensor_type':'smart_meter','sequence_number':seq,'measured_at':at.isoformat(),'credential':'frontend-fixture-credential','data':{'grid_export_energy_kwh':5*f if index==0 else 0,'grid_import_energy_kwh':3*f if index==1 else 0,'consumption_energy_kwh':3*f if index==1 else 0}})
   await _insert_batch(db,messages);await db.commit();processor=EnergyProcessor();await processor.process_pending(db);await processor.finalize_closed_intervals(db)
   chain=NativeSettlementChain(w3);batch=await chain.service.calculate_interval(db,cid,start);await db.commit();batch_id=batch.id;chain_batch_id=batch.chain_batch_id
  # Seed fully confirmed funding using real calls. Browser tests then add deposits,

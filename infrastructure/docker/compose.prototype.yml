@@ -113,7 +113,7 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 768M
+          memory: 3G
     depends_on:
       anvil-state-init: {condition: service_completed_successfully}
     healthcheck:

@@ -59,3 +59,12 @@ iot/state/
 .run/
 
 !**/.env.sepolia.example
+
+# Graphify generated knowledge graph outputs
+graphify-out/
+
+# Local PowerShell startup and shutdown helpers
+initsistem.ps1
+initsistem.cmd
+stopsistem.ps1
+stopsistem.cmd

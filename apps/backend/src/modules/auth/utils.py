@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from itsdangerous import URLSafeTimedSerializer
 import bcrypt
 import jwt
@@ -24,7 +24,7 @@ def create_access_token(
     payload = {}
 
     payload["user"] = user_data
-    payload["exp"] = datetime.now() + (
+    payload["exp"] = datetime.now(UTC) + (
         expiry if expiry is not None else timedelta(seconds=ACCESS_TOKEN_EXPIRY)
     )
     payload["jti"] = str(uuid.uuid4())
@@ -68,4 +68,3 @@ def decode_url_safe_token(token:str):
     
     except Exception as e:
         logging.error(str(e))
-        

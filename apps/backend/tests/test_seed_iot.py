@@ -202,6 +202,7 @@ async def test_seeded_physical_readings_create_only_observed_export_eligibility(
             and m["sensor_type"] == "smart_meter"
             and m["sequence_number"] == sim._sequence_numbers["SM-MS-002-001"]
         )
+        assert producer.generation_wh > 0
         assert producer.eligible_export_wh == round(Decimal(exported) * 1000) > 0
         assert consumer.grid_import_wh > 0 and consumer.eligible_export_wh == 0
         assert producer.quality_status == consumer.quality_status == "FINALIZED"
