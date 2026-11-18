@@ -6,7 +6,7 @@ COMPOSE_FILE := $(ROOT_DIR)/infrastructure/docker/compose.prototype.yml
 COMPOSE      := docker compose --env-file $(ROOT_DIR)/infrastructure/docker/.env -f $(COMPOSE_FILE)
 
 .PHONY: help setup recover-demo repair-demo up down logs ps build migrate seed test test-contracts test-iot \
-        test-backend lint format typecheck contracts-deploy clean recover backup doctor demo simulate
+        test-backend lint format typecheck contracts-deploy clean recover backup doctor demo simulate blockchain-check
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -78,6 +78,9 @@ demo: ## Commission deterministic governed local users, nodes and meters
 
 demo-scenario: ## Verify actual MQTT, automatic settlement, SUN retirement and earnings withdrawal
 	PYTHONPATH=apps/backend python scripts/demo_scenario.py
+
+blockchain-check: ## Insert validated SQLModel test readings and verify real local ETH/SUN operations
+	PYTHONPATH=apps/backend python scripts/check_blockchain.py
 
 simulate: ## Start the registered REALTIME MQTT simulator for the governed demo
 	python scripts/stack.py simulate

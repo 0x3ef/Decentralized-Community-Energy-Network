@@ -85,6 +85,38 @@ another payment or retirement. Public local evidence is retained in
 [verification](verification.md); current private runtime output is
 `.run/demo/scenario-report.json`.
 
+### Insert test data directly into PostgreSQL
+
+With the original local stack running (`make up`), activate the Python environment
+and run:
+
+```bash
+make blockchain-check
+```
+
+This inserts six explicitly `SIMULATED` boundary/warmup readings for the registered
+producer and consumer, using the SQLModel telemetry models and the same authenticated
+ingestion/typed-reading validation as the subscriber. It bypasses MQTT transport;
+use `make demo-scenario` to test MQTT as well. Existing records are retained. No
+credits, settlements or transaction confirmations are manufactured by SQL inserts.
+
+The running worker calculates the interval and submits its batch. The script then
+uses the local governance and participant test wallets to finalize the batch,
+deposit ETH, approve/escrow SUN, wait for delivery/payment, retire 3 SUN, and withdraw
+the producer's 0.003 test ETH. It checks confirmed receipts, API projections, SUN
+supply and vault solvency before printing `VERIFIED`. These local test signatures
+replace the approvals a governor and users perform manually in the application;
+inserting readings alone does not authorize those actions. Public chains are refused.
+
+Both commands share **one resumable fixture** in `.run/demo/scenario.json`. If you
+already completed `demo-scenario`, this command verifies that existing result;
+it does not insert another interval or pay twice. Keep the journal on failure and
+rerun the same command. Do not delete it to repeat financial operations. After a
+chain recovery, wait until the first complete post-recovery interval is closed
+(the script reports the required UTC time). Conflicting later meter evidence is
+refused rather than overwriting counters. Inspect `.run/demo/scenario-report.json`
+for batch, user transaction hashes and the actual transport used.
+
 ## Start continuous simulation
 
 ```bash

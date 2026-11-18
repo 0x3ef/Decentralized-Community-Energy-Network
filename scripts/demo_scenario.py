@@ -1,7 +1,9 @@
 """Real local MQTT + HTTP + EVM demonstration, with resumable user action hashes."""
 
+import fcntl
 import json
 import os
+import subprocess
 import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -51,7 +53,45 @@ def counter_data(baseline, code, producer, fraction):
     }
 
 
-def run():
+def insert_database(messages):
+    """Use the running API's original DB configuration, without exposing secrets."""
+    # Import by path: direct script execution puts scripts/ on sys.path.
+    from stack import Stack
+
+    stack = Stack()
+    source = (ROOT / "apps/backend/src/protocol/scenario_seed.py").read_text()
+    result = subprocess.run(
+        [*stack.base, "exec", "-T", "api", "python", "-c", source],
+        cwd=ROOT,
+        input=json.dumps(messages),
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode:
+        # Tracebacks may contain payload values; keep credentials out of logs.
+        raise RuntimeError(
+            "Database seed refused: check meter authorization, interval/counter conflicts and local deployment; no seed rows were committed"
+        )
+    return json.loads(result.stdout)
+
+
+def run(transport="mqtt"):
+    directory = ROOT / ".run/demo"
+    if not (directory / "demo.json").exists():
+        raise ValueError("Run make up first; the original local deployment is required")
+    with (directory / "scenario.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError(
+                "Another scenario is running; wait for it to finish"
+            ) from None
+        return _run(transport)
+
+
+def _run(transport):
+    if transport not in ("mqtt", "database"):
+        raise ValueError("Unknown scenario transport")
     load_dotenv(ROOT / "infrastructure/docker/.env", override=False)
     directory = ROOT / ".run/demo"
     demo = json.loads((directory / "demo.json").read_text())
@@ -123,6 +163,10 @@ def run():
         journal = json.loads(journal_path.read_text())
         if journal["community_id"] != cid:
             raise ValueError("Scenario journal belongs to another community")
+        print(
+            "Resuming the existing fixture; confirmed readings and payments are not repeated.",
+            flush=True,
+        )
     else:
         start, end = new_interval(datetime.now(UTC), baseline)
         journal = {
@@ -189,12 +233,14 @@ def run():
             line.split("=", 1)
             for line in (directory / "simulator.env").read_text().splitlines()
         )
-        publisher = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-        publisher.connect(
-            os.environ.get("DEMO_MQTT_HOST", "127.0.0.1"),
-            int(os.environ.get("DEMO_MQTT_PORT", "1883")),
-        )
-        publisher.loop_start()
+        publisher = None
+        if transport == "mqtt":
+            publisher = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+            publisher.connect(
+                os.environ.get("DEMO_MQTT_HOST", "127.0.0.1"),
+                int(os.environ.get("DEMO_MQTT_PORT", "1883")),
+            )
+            publisher.loop_start()
         messages = []
         try:
             warmup = (
@@ -249,20 +295,27 @@ def run():
                 "credential": "invalid-fixture-credential",
                 "message_id": str(uuid5(NAMESPACE_URL, cid + ":invalid")),
             }
-            for message in [invalid, *messages, *messages]:
-                topic = (
-                    f"solar/{cid}/{message['node_id']}/{message['device_id']}/telemetry"
+            if transport == "database":
+                journal["database_seed"] = insert_database(messages)
+                print(
+                    "Database evidence: " + json.dumps(journal["database_seed"]),
+                    flush=True,
                 )
-                publisher.publish(topic, json.dumps(message), qos=1).wait_for_publish(
-                    timeout=10
-                )
+            else:
+                for message in [invalid, *messages, *messages]:
+                    topic = f"solar/{cid}/{message['node_id']}/{message['device_id']}/telemetry"
+                    publisher.publish(
+                        topic, json.dumps(message), qos=1
+                    ).wait_for_publish(timeout=10)
         finally:
-            publisher.disconnect()
-            publisher.loop_stop()
+            if publisher:
+                publisher.disconnect()
+                publisher.loop_stop()
         journal["published"] = True
+        journal["transport"] = transport
         save_json(journal_path, journal)
     print(
-        "Waiting for authenticated MQTT ingestion, interval calculation and native batch submission.",
+        "Waiting for validated telemetry, interval calculation and native batch submission.",
         flush=True,
     )
 
@@ -393,7 +446,9 @@ def run():
         "sun_supply_units": str(sun.functions.totalSupply().call()),
         "vault_liabilities_wei": str(vault.functions.totalLiabilities().call()),
         "transactions": journal["actions"],
-        "notice": "Actual local MQTT, workers, confirmed test ETH and SUN. No physical routing or utility bill alteration.",
+        "transport": journal.get("transport", "mqtt"),
+        "database_seed": journal.get("database_seed"),
+        "notice": "Actual local validated telemetry, workers, confirmed test ETH and SUN. No physical routing or utility bill alteration.",
     }
     save_json(directory / "scenario-report.json", report)
     print(

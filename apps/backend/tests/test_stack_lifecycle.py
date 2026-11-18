@@ -380,3 +380,42 @@ async def test_backend_recovery_refuses_nonlocal_settings_before_sql(
             "",
             "",
         )
+
+
+@pytest.mark.parametrize("returncode", [0, 1])
+def test_database_scenario_uses_original_api_and_keeps_credentials_off_command_line(
+    monkeypatch, returncode
+):
+    import sys
+
+    module = load("database_scenario_transport", "scripts/demo_scenario.py")
+    monkeypatch.setitem(
+        sys.modules,
+        "stack",
+        SimpleNamespace(
+            Stack=lambda: SimpleNamespace(
+                base=["docker", "compose", "original-project"]
+            )
+        ),
+    )
+    messages = [{"credential": "private-test-credential"}]
+
+    def execute(command, **kwargs):
+        assert command[:3] == ["docker", "compose", "original-project"]
+        assert command[3:7] == ["exec", "-T", "api", "python"]
+        assert "private-test-credential" not in " ".join(command)
+        assert json.loads(kwargs["input"]) == messages
+        assert kwargs["capture_output"]
+        return SimpleNamespace(
+            returncode=returncode,
+            stdout='{"inserted": 6, "duplicates": 0}',
+            stderr="private-test-credential",
+        )
+
+    monkeypatch.setattr(module.subprocess, "run", execute)
+    if returncode:
+        with pytest.raises(RuntimeError, match="Database seed refused") as error:
+            module.insert_database(messages)
+        assert "private-test-credential" not in str(error.value)
+    else:
+        assert module.insert_database(messages) == {"inserted": 6, "duplicates": 0}

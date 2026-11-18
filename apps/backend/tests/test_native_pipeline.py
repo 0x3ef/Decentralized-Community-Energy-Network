@@ -38,6 +38,7 @@ from src.modules.settlement.models import (
     SettlementClaim,
 )
 from src.modules.wallet.models import Wallet
+from src.protocol.scenario_seed import insert_scenario
 from web3 import Web3
 
 
@@ -283,10 +284,33 @@ async def test_native_pipeline_replay_crash_recovery_and_reorganization(monkeypa
                 )
         invalid = {**messages[0], "credential": "wrong"}
         assert await _insert_batch(db, [invalid]) == (0, 0)
-        assert await _insert_batch(db, messages + messages) == (4, 4)
+        # The user-facing database seed must drive the same real pipeline and
+        # remain safe to retry after a committed insertion/host interruption.
+        assert await insert_scenario(db, messages) == {"inserted": 4, "duplicates": 0}
+        assert await insert_scenario(db, messages) == {"inserted": 0, "duplicates": 4}
+        with pytest.raises(ValueError, match="later evidence"):
+            async with db.begin_nested():
+                await insert_scenario(
+                    db, [{**m, "message_id": str(uuid4())} for m in messages]
+                )
+        with pytest.raises(ValueError, match="Conflicting or invalid"):
+            async with db.begin_nested():
+                changed = [
+                    {**m, "data": {**m["data"], "grid_export_energy_kwh": 99}}
+                    for m in messages
+                ]
+                await insert_scenario(db, changed)
+        with pytest.raises(ValueError, match="authentication"):
+            async with db.begin_nested():
+                await insert_scenario(
+                    db, [{**m, "credential": "wrong"} for m in messages]
+                )
         await db.commit()
         processor = EnergyProcessor()
         assert await processor.process_pending(db) == 4
+        # A crash after committing telemetry can resume even after the worker
+        # has advanced its quality status to PROCESSED.
+        assert await insert_scenario(db, messages) == {"inserted": 0, "duplicates": 4}
         await processor.finalize_closed_intervals(db)
         intervals = (
             await db.exec(
