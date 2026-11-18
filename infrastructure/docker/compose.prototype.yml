@@ -1,4 +1,7 @@
 name: solar-prototype
+x-logging: &logging
+  driver: json-file
+  options: {max-size: '10m', max-file: '3'}
 x-backend: &backend
   image: testp2p-api:local
   build:
@@ -7,6 +10,8 @@ x-backend: &backend
     target: api
     secrets: [proxy_ca]
   env_file: .env
+  restart: unless-stopped
+  logging: *logging
   volumes:
     - ${CLOUD_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}:/run/runtime-ca.pem:ro
   environment: &environment
@@ -32,6 +37,8 @@ services:
       POSTGRES_PASSWORD: solar
       POSTGRES_DB: solar
     volumes: [postgres:/var/lib/postgresql/data]
+    restart: unless-stopped
+    logging: *logging
     healthcheck:
       test: [CMD-SHELL, "pg_isready -U solar -d solar"]
       interval: 2s
@@ -39,6 +46,8 @@ services:
       retries: 30
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
+    logging: *logging
     healthcheck:
       test: [CMD, redis-cli, ping]
       interval: 2s
@@ -46,6 +55,8 @@ services:
       retries: 30
   mosquitto:
     image: eclipse-mosquitto:2.0
+    restart: unless-stopped
+    logging: *logging
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mqtt:/mosquitto/data
@@ -63,16 +74,19 @@ services:
     volumes: [anvil_state:/state]
     restart: 'no'
   anvil:
-    image: ghcr.io/foundry-rs/foundry:v1.5.0
-    entrypoint: [anvil, --host, 0.0.0.0, --chain-id, "31337", --block-time, "1"]
+    image: testp2p-anvil:local
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.anvil
     ports: ["127.0.0.1:8545:8545"]
     volumes: [anvil_state:/state]
-    command: [--state, /state/anvil.json, --state-interval, "5", --preserve-historical-states]
+    restart: unless-stopped
+    logging: *logging
     stop_grace_period: 60s
     depends_on:
       anvil-state-init: {condition: service_completed_successfully}
     healthcheck:
-      test: [CMD-SHELL, "cast chain-id --rpc-url http://127.0.0.1:8545 >/dev/null && test -s /state/anvil.json"]
+      test: [CMD, python, /opt/anvil_supervisor.py, health]
       interval: 5s
       timeout: 4s
       retries: 20
@@ -81,6 +95,7 @@ services:
     depends_on:
       timescaledb: {condition: service_healthy}
     command: [alembic, upgrade, head]
+    restart: 'no'
   api:
     <<: *backend
     ports: ["127.0.0.1:8000:8000"]
@@ -121,6 +136,8 @@ services:
         VITE_SEPOLIA_RPC_URL: ${VITE_SEPOLIA_RPC_URL:-}
       secrets: [proxy_ca]
     ports: ["127.0.0.1:8080:80"]
+    restart: unless-stopped
+    logging: *logging
     depends_on:
       api: {condition: service_healthy}
 volumes:

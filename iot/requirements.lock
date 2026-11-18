@@ -1,0 +1,11 @@
+# Pinned runtime dependencies; development tools stay outside simulator images.
+annotated-types==0.8.0
+grpcio==1.85.1
+paho-mqtt==2.2.0
+protobuf==7.36.2
+pydantic==2.14.3
+pydantic-core==2.50.4
+pydantic-settings==2.16.2
+python-dotenv==1.2.4
+typing-extensions==4.16.0
+typing-inspection==0.4.5

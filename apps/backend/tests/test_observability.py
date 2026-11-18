@@ -84,3 +84,25 @@ def test_invalid_settings_do_not_render_secret_inputs():
         )
     assert "hidden-short-jwt" not in str(failure.value)
     assert "hidden-backend-key" not in str(failure.value)
+
+
+@pytest.mark.asyncio
+async def test_ready_reports_missing_contracts_even_when_rpc_and_workers_are_ready(
+    monkeypatch,
+):
+    from src.core.config import Config
+
+    monkeypatch.setattr(Config, "COMMUNITY_REGISTRY_ADDRESS", "0x" + "9" * 40)
+    await heartbeat("worker")
+    await heartbeat("subscriber")
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://localhost"
+        ) as client:
+            result = await client.get("/ready")
+        assert result.status_code == 503
+        assert result.json()["components"]["blockchain"]["state"] == "missing_contracts"
+    finally:
+        await token_blocklist.delete(
+            "solar:heartbeat:worker", "solar:heartbeat:subscriber"
+        )

@@ -31,12 +31,13 @@ community deployments/cursors use `community_id`, meter authorization uses
 | `device_counter_snapshots`, `energy_power_snapshots` | Processed counter baselines and per-channel power integration state |
 | `energy_intervals`, `energy_credits`, `credit_movements` | Integer Wh, time bounds, calculation version, quality and source-linked evidence; credit references one interval and owner |
 | `native_settlement_policies` | Immutable community/policy-hash snapshot, price, rules and governance reference |
-| `native_settlement_batches` | Community/policy FK, unique interval, chain batch ID, Merkle root, evidence, totals and status |
+| `native_settlement_batches` | Community/policy FK, unique interval, chain batch ID, Merkle root, evidence, totals, status and local-history archive flag |
 | `native_settlement_claims` | Batch/user/node/internal meter/interval FKs, optional unique credit FK, on-chain claim ID, Wh and saved proof |
 | `native_interval_allocations` | Batch, producer/consumer users and nodes, injection/demand intervals, price-derived `due_wei`, proof and funding/delivery state |
 | `community_native_deployments` | Governed per-community chain, SUN, settlement and vault bindings |
 | `outbox_events`, `community_chain_operations` | Durable job lease/attempt/error and signed oracle bytes/hash/nonce/chain genesis; operation references unique outbox job |
-| `native_indexed_events`, `native_sync_cursors`, `native_wallet_transactions` | Canonical chain event/cursor projections and participant-submitted transaction references |
+| `native_indexed_events`, `native_sync_cursors`, `native_wallet_transactions` | Canonical chain projections and participant transactions; archived local history is retained separately from active statements |
+| `local_chain_recoveries` | Explicit local recovery audit: old/new bindings, original record states, target genesis and completion status |
 | `community_energy_ledger`, `audit_events` | Retained accounting/audit evidence; community ledger rejects UPDATE/DELETE through a PostgreSQL trigger |
 | `community_chain_deployments`, `community_chain_sync_state`, `community_energy_allocations`, `compensation_requests`, `settlement_obligations` | Historical ERC-20 protocol deployments, reservations, retirements and simulated payment evidence; separate from native records |
 | `orders`, `trades`, `redemptions`, `blockchain_transactions`, `blockchain_events` | Earlier marketplace/redemption and generic transaction history; not the active native settlement ledger |
@@ -105,6 +106,14 @@ records. Native balances, delivery and retirement are chain-authoritative;
 `native_*` projections and tracked transaction statuses must be reconciled to
 confirmed receipts/events. Database administrators still control the database;
 the append-only trigger is not a claim of tamper-proof storage.
+
+Local chain recovery retains every row and adds an audit entry. Historical batches
+and wallet transactions carry `archived=true`; previous events remain with
+`canonical=false`. Old oracle operations become ARCHIVED and are never replayed.
+The active native deployment records an `accounting_start` cutoff, preventing
+reissuance from old energy intervals. Wallet transaction uniqueness includes chain
+genesis so a new local chain cannot silently reuse an archived transaction record.
+See [local recovery](deployment.md#recover-a-local-demo-after-lost-anvil-state).
 
 ## Migration and recovery workflow
 

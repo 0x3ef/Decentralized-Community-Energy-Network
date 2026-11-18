@@ -13,7 +13,7 @@ a hardened production deployment. Initial local setup belongs to
 | `timescaledb` | PostgreSQL 16 through TimescaleDB 2.17.2 image | Internal only |
 | `redis` | Revocation, heartbeats, optional mail broker | Internal only |
 | `mosquitto` | MQTT 2.0 broker, persistent messages | 127.0.0.1:1883 |
-| `anvil` | Local EVM, chain 31337, one-second mining | 127.0.0.1:8545 |
+| `anvil` | Local EVM, chain 31337, instant transaction mining + 12-second empty blocks | 127.0.0.1:8545 |
 | `migrate` | One-off reviewed Alembic upgrade | None |
 | `api` | FastAPI under `/api/v1` | 127.0.0.1:8000 |
 | `subscriber` | Standalone MQTT-to-SQL ingest | None |
@@ -27,33 +27,55 @@ liveness; worker/subscriber health checks require fresh Redis heartbeat state.
 The `migrate` service uses the configured image entry point and applies static
 revisions; no application replica generates a migration.
 
-PostgreSQL, MQTT and Anvil have persistent volumes. Anvil saves state every five
-seconds with historical states preserved. Back up SQL journals and EVM state
-together. Redis has no persistent volume in this prototype; its loss can remove
-revocation/heartbeat state. Simulation uses an additional checkpoint volume.
+PostgreSQL, MQTT, Anvil and simulation checkpoints use named volumes. The project
+name is read from the original private env file and is never changed by recovery.
+The lifecycle always includes both canonical Compose files, preventing simulator
+containers from being stranded on a removed network. Stale network references
+trigger one container-recreation retry while retaining named volumes.
 
-The older `infrastructure/docker/docker-compose.yml` remains a legacy artifact
-with differing ports, secrets, gRPC routing and frontend variables. Do not combine
-it with this guide or use it as the canonical installation command.
+Anvil is supervised by a small Python process in a pinned Foundry-based image.
+It retains 128 historical states, disables historical disk spill, and mines
+transactions immediately while adding empty blocks every 12 seconds. Every 30
+seconds and on graceful shutdown, the supervisor obtains an RPC snapshot, validates
+it, fsyncs a temporary file and atomically replaces `anvil.json`. The previous
+completed checkpoint is retained as `anvil.previous.json`. A failed/incomplete
+write cannot replace the completed file. Invalid current state falls back to a
+valid previous checkpoint; two invalid files stop startup with a recovery message.
+Snapshots have a 128 MiB ceiling and a free-space check; failures retain prior files.
+Unexpected termination can lose transactions since the most recent checkpoint;
+SQL/EVM reconciliation remains necessary. Container logs rotate at 3 x 10 MiB.
+The original genesis timestamp/hash is persisted independently, duplicate
+restart-generated block-zero headers are excluded on load, and the mining clock
+resumes at current UTC time above the saved head. This preserves network identity
+without leaving new blocks stuck near the original genesis time after restart.
 
 ## Builds and routine commands
 
 ```bash
-make build
-make migrate
-make up
-make ps
+make setup       # first local installation: build, migrate and commission
+make up          # resume/update the complete application
+make simulate    # complete application plus registered continuous simulator
+make doctor      # containers, space, deployment and readiness
+make backup      # verified private pg_dump archive
+make down        # stop all canonical services, including simulator; retain volumes
 ```
 
-Run migrations deliberately when changing schema; `make up` alone does not build
-new source. `make logs` follows Compose logs; `make down` stops the canonical stack
-while preserving volumes. `make clean` is destructive: it deletes canonical volumes
-and contract artifacts. It is not a normal recovery command. The optional simulator
-overlay should be stopped with its own profile/overlay before taking down the base.
+[stack.py](../scripts/stack.py) is the single lifecycle implementation. Builds run
+serially, API code is built once, and simulation never rebuilds dependency services
+implicitly. Startup checks deployment state before starting application writers.
+Missing contracts produce an actionable recovery error instead of normal startup
+against stale addresses. A process lock prevents overlapping lifecycle commands.
+Original credentials and existing records are never overwritten by initialization.
+`make build` explicitly builds all images; `make clean` removes compiler artifacts
+only and never removes Docker volumes. The legacy Docker Compose file and the
+script that switched to a fresh SQL project have been removed.
 
 The frontend is a multi-stage Vite/nginx image. Its public configuration is baked
 at build time. nginx proxies `/api/` before static asset regexes and refreshes Docker
 DNS so an API container's changed IP does not leave stale 502 responses.
+Simulator/gateway images install pinned runtime dependencies from
+`iot/requirements.lock` before copying code. Test runners, type checkers and
+compilers are confined to the test stage, and code edits reuse the dependency layer.
 
 Managed builds use an optional BuildKit `proxy_ca` secret; runtime clients mount a
 combined trust bundle. Keep TLS verification enabled. Both `NO_PROXY` and `no_proxy`
@@ -98,101 +120,53 @@ a public production system.
 
 ## Repair unused local contracts on the same database
 
-When the original local chain was lost but the database contains only identity,
-device and telemetry data, use this path to keep the **same database and Compose
-project**. It does not create another SQL volume or rotate participant credentials.
-
-With the original private `.env` and `.run/demo` files retained, the local node
-running and the Python environment active:
-
-```bash
-make build
-make repair-demo
-make simulate
-curl --max-time 10 -sS http://127.0.0.1:8000/ready
-```
-
-The wrapper temporarily stops API/worker/subscriber writes and exports a private
-PostgreSQL dump to `.run/demo/sql-backup-*.dump`. It commissions missing local
-contracts and synchronizes their bindings, activation receipt and empty native
-index cursor. Existing users, password hashes, wallets, homes, devices, telemetry,
-counters, meter credentials and pending physical credits are preserved. Old/new
-binding metadata and the old deployment journal are archived in
-`.run/demo/recommission-*`. The original SEED_PASSWORD and SEED_DEVICE_KEY must
-match existing identities; the repair refuses to overwrite ownership or passwords.
-
-Recommissioning refuses public networks, an intact registry, existing SUN supply
-or vault funds, and recorded native batches, participant transactions, indexed
-financial events, signed/native jobs, approved/issued credits or historical financial
-data. Old governance-only indexed events remain retained as noncanonical audit
-records and the new registry is indexed afresh.
-Even pending financial records require review. These guards do not infer the
-absence of a payment merely from a user's recollection. No financial history is
-deleted or assigned to the new contracts. If a guard stops the command, inspect its
-reason; do not clear tables to bypass it.
-
-After repair, current telemetry should advance and `/ready` should show worker
-and subscriber ready. `make demo-scenario` can separately verify funded settlement
-and retirement; it performs actual local test transactions. That is a validation
-step, not a prerequisite for preserving old telemetry.
+`make repair-demo` and `make recover-demo` are compatibility aliases for the single
+same-database recovery command below. There is no isolated replacement database.
 
 ## Recover a local demo after lost Anvil state
 
-If RPC is healthy but the database's registry address has zero bytecode, the
-current node does not contain that deployment. An empty `/state` volume cannot
-restore it. Do not point historical SQL balances at newly deployed contracts.
-Use a known valid external chain backup if one exists; the workflow below creates
-a **replacement demonstration**, not a restoration of old on-chain history.
-
-The named-volume persistence defect was reproduced: Docker creates a new `/state`
-mount owned by root, while the Foundry image runs as UID 1000. The corrected
-`anvil-state-init` one-off service assigns that specific volume to UID/GID 1000
-with private directory permissions. Anvil health now requires both RPC and a
-nonempty periodic state file. A graceful stop allows 60 seconds for its state dump;
-an abrupt kill can still lose changes since the latest successful periodic save.
-
-From the repository root, with the Python environment active, contract artifacts
-compiled and the local node reachable:
+If checkpoints are corrupt, or the node has no code at stored contract addresses:
 
 ```bash
-python scripts/recover_local_demo.py   # read-only preflight
-make recover-demo                    # explicitly archive and replace the demo
+source .venv/bin/activate
+make recover
+make doctor
 ```
 
-Recovery refuses nondevelopment/public RPC configurations and refuses an intact
-registry. It stops the old Compose project, creates a private PostgreSQL custom
-archive and retains the old containers/volumes. Old settings, encrypted wallets,
-bootstrap/scenario journals and browser fixture tokens are archived under a
-mode-0700 `.run/recovery-*` directory. The dump/settings are private; never commit
-or publish that directory. The archive does not recreate missing chain receipts.
+This is an explicit LOCAL chain replacement, not recovery of lost blockchain
+transactions. It uses the SAME Compose project, PostgreSQL volume, private
+credentials, users, wallets, homes, devices and telemetry. No rows are deleted.
+The command stops writers and the simulator, verifies a private PostgreSQL custom
+archive under `.run/backups/<timestamp>/database.dump`, and retains original
+configuration, encrypted wallets and deployment/scenario metadata beside it.
+Do not publish these private archives. Large pre-existing corrupt Anvil copies
+are not duplicated into every SQL backup; active node files are moved into
+`/state/archive/<timestamp>/` inside the original Anvil volume.
 
-A new `solar-recovery-*` Compose project receives independent SQL, MQTT, simulation
-and EVM volumes, freshly generated JWT/oracle/seed credentials and a newly governed
-community. `COMPOSE_PROJECT_NAME` is persisted in `infrastructure/docker/.env`, so
-subsequent Make/bootstrap commands address the replacement. Keep shell overrides
-unset. No volume is deleted, and old balances/credits are not copied into the new
-financial environment. If any stage fails, preserve the archive and partial new
-project; inspect its stage before resuming setup/bootstrap instead of deleting it.
+After starting a fresh local node, the backend records an explicit
+`local_chain_recoveries` audit with old bindings and original record states. Native
+batches and wallet transactions are marked archived, indexed events become
+noncanonical, and old signed operations are blocked from replay. Claims,
+allocations, credits, telemetry and every other row remain retained. Active
+statements exclude archived financial projections. Prior ETH/SUN balances,
+payments and retirements are not recreated or presented as current balances.
 
-The command checks the state file, restarts the new Anvil, verifies the genesis
-and all five deployed contracts, and reruns idempotent bootstrap to re-unlock only
-the local fixture accounts. Then run:
+The same fixture identities and original meter credentials are commissioned against
+the new contracts. A new accounting cutoff prevents historical intervals from
+issuing tokens again. Only new fully observed intervals may create new batches.
+Recovery persists its in-progress marker and deployment journal so an interrupted
+commissioning can resume on the same new chain. It checkpoints the contracts,
+updates configuration, rebuilds the frontend, and starts the full app and simulator.
+An intact fully deployed protocol is not reset. Nonlocal environments are refused.
+The optional finite scenario also preserves cumulative meter baselines after
+recovery. It refuses to reuse pre-recovery intervals and reports when the first
+complete new interval plus its two-minute grace period becomes available.
 
-```bash
-make demo-scenario
-make simulate
-make ps
-```
-
-Close the old app session and use the **new** `SEED_PASSWORD` and new encrypted
-wallets. These replacement credentials differ from the archived demo. Container
-names now start with the recovery project name; prefer Compose service commands
-over old hardcoded `solar-prototype-*` container names.
-
-The original database remains accessible through its retained container or the
-private dump. Restoring that dump into a disposable inspection database can recover
-off-chain records, not their lost blockchain state. This workflow is local-only and
-must never serve as a public-network payment or accounting migration.
+If `/state` still contains a valid previous snapshot, normal startup can restore it
+without a chain replacement. Back up SQL and EVM state together; a SQL dump alone
+cannot reconstruct EVM contract storage, receipts or balances. Keep `.env` and
+`.run/demo` when moving checkouts. The original `COMPOSE_PROJECT_NAME` must select
+the same existing PostgreSQL volume; never use another project to hide old records.
 
 ## Sepolia deployment and commissioning
 

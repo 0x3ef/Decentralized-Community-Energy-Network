@@ -5,8 +5,7 @@ PROTO_DIR  := protos
 OUT_DIR    := grpc_client
 PROTO_FILE := $(PROTO_DIR)/sensor.proto
 
-# Path to the compose file (relative to iot/)
-COMPOSE    := docker compose -f ../infrastructure/docker/docker-compose.yml
+# Deployment is owned by the root lifecycle; this file keeps IoT development tasks.
 
 .PHONY: help install protos clean-protos \
         test test-unit test-integration test-all test-cov \
@@ -78,20 +77,20 @@ typecheck: protos ## Run mypy
 # Docker
 # ---------------------------------------------------------------------------
 build: ## Build all images
-	$(COMPOSE) build
+	$(MAKE) -C .. build
 
 up: ## Start the full local stack
-	$(COMPOSE) up --build -d
+	$(MAKE) -C .. simulate
 
 down: ## Stop the stack (keep volumes)
-	$(COMPOSE) down
+	$(MAKE) -C .. down
 
-clean: ## Stop the stack and delete volumes
-	$(COMPOSE) down -v
+clean: ## Remove compiler artifacts only; retain all data and volumes
+	$(MAKE) -C .. clean
 
 logs: ## Tail logs from all services
-	$(COMPOSE) logs -f
+	$(MAKE) -C .. logs
 
 ps: ## Show container status
-	$(COMPOSE) ps
+	$(MAKE) -C .. ps
 

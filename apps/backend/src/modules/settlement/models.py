@@ -66,6 +66,7 @@ class SettlementBatch(SQLModel, table=True):
     total_due_wei: Decimal = Field(sa_column=Column(Numeric(78, 0), nullable=False))
     evidence: dict = Field(sa_column=Column(JSONB, nullable=False))
     status: str = Field(default="PREPARED", max_length=30, index=True)
+    archived: bool = False
     created_at: datetime = Field(
         default_factory=utcnow, sa_type=DateTime(timezone=True)
     )
@@ -142,11 +143,15 @@ class IndexedNativeEvent(SQLModel, table=True):
 
 class NativeWalletTransaction(SQLModel, table=True):
     __tablename__ = "native_wallet_transactions"
-    __table_args__ = (UniqueConstraint("chain_id", "transaction_hash"),)
+    __table_args__ = (
+        UniqueConstraint("chain_id", "chain_genesis", "transaction_hash"),
+    )
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     community_id: UUID = Field(foreign_key="energy_communities.id", index=True)
     user_id: UUID = Field(foreign_key="users.uid", index=True)
     chain_id: int
+    chain_genesis: str = Field(default="", max_length=66)
+    archived: bool = False
     transaction_hash: str = Field(max_length=66)
     action: str = Field(max_length=40)
     status: str = Field(default="SUBMITTED", max_length=30)
@@ -161,3 +166,18 @@ class NativeSyncCursor(SQLModel, table=True):
     community_id: UUID = Field(foreign_key="energy_communities.id", primary_key=True)
     block_number: int = Field(default=-1, sa_type=BigInteger)
     block_hash: str | None = Field(default=None, max_length=66)
+
+
+class LocalChainRecovery(SQLModel, table=True):
+    """Audit of an explicit local-chain replacement; no historical rows are deleted."""
+
+    __tablename__ = "local_chain_recoveries"
+    __table_args__ = (UniqueConstraint("community_id", "new_genesis"),)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    community_id: UUID = Field(foreign_key="energy_communities.id")
+    new_genesis: str = Field(max_length=66)
+    status: str = Field(default="PREPARED", max_length=20)
+    details: dict = Field(default_factory=dict, sa_column=Column(JSONB, nullable=False))
+    created_at: datetime = Field(
+        default_factory=utcnow, sa_type=DateTime(timezone=True)
+    )

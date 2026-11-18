@@ -7,7 +7,7 @@ mkdir -p "$DEV_TOOLS"
 export PIP_CACHE_DIR="${PIP_CACHE_DIR:-$DEV_TOOLS/pip-cache}"
 export npm_config_cache="${npm_config_cache:-$DEV_TOOLS/npm-cache}"
 python3 -m venv "$DEV_VENV"
-"$DEV_VENV/bin/python" -m pip install -r "$ROOT_DIR/apps/backend/requirements.lock"
+"$DEV_VENV/bin/python" -m pip install -r "$ROOT_DIR/apps/backend/requirements.lock" -r "$ROOT_DIR/iot/requirements.lock"
 "$DEV_VENV/bin/python" -m pip install -e "$ROOT_DIR/apps/backend[dev]" -e "$ROOT_DIR/iot[dev]"
 npm --prefix "$DEV_TOOLS" install @foundry-rs/forge@1.7.1 @foundry-rs/anvil@1.7.1 @foundry-rs/cast@1.7.1
 if [ ! -d "$ROOT_DIR/contracts/lib/openzeppelin-contracts" ]; then

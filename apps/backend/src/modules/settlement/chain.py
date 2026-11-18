@@ -64,7 +64,7 @@ class NativeSettlementChain(CommunityChain):
 
     async def function(self, session, job):
         batch = await session.get(SettlementBatch, UUID(job.payload["batch_id"]))
-        if not batch or batch.status == "RECONCILIATION_REQUIRED":
+        if not batch or batch.archived or batch.status == "RECONCILIATION_REQUIRED":
             raise ValueError("Batch requires reconciliation before new operations")
         await self.validate_source(session, batch)
         _, deployment, _registry, settlement, vault = await self.service.contracts(
@@ -369,6 +369,7 @@ class NativeSettlementChain(CommunityChain):
                 .where(
                     OutboxEvent.event_type.like("native.%"),
                     OutboxEvent.payload["community_id"].astext == str(community_id),
+                    ChainOperation.status != "ARCHIVED",
                     ChainOperation.status.in_(["CONFIRMED", "FAILED"]),
                 )
             )
@@ -407,7 +408,8 @@ class NativeSettlementChain(CommunityChain):
             for batch in (
                 await session.exec(
                     select(SettlementBatch).where(
-                        SettlementBatch.community_id == community_id
+                        SettlementBatch.community_id == community_id,
+                        SettlementBatch.archived.is_(False),
                     )
                 )
             ).all():
@@ -511,7 +513,8 @@ class NativeSettlementChain(CommunityChain):
         for batch in (
             await session.exec(
                 select(SettlementBatch).where(
-                    SettlementBatch.community_id == community_id
+                    SettlementBatch.community_id == community_id,
+                    SettlementBatch.archived.is_(False),
                 )
             )
         ).all():
@@ -604,7 +607,8 @@ class NativeSettlementChain(CommunityChain):
         for tx in (
             await session.exec(
                 select(NativeWalletTransaction).where(
-                    NativeWalletTransaction.community_id == community_id
+                    NativeWalletTransaction.community_id == community_id,
+                    NativeWalletTransaction.archived.is_(False),
                 )
             )
         ).all():

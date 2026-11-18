@@ -132,6 +132,15 @@ class CommunitySettlementService:
         if start.microsecond or int(start.timestamp()) % policy.interval_seconds:
             raise ValueError("Start must align with the governed interval")
         end = start + timedelta(seconds=policy.interval_seconds)
+        deployment = await session.get(NativeDeployment, community_id)
+        if (
+            deployment
+            and deployment.accounting_start
+            and start < deployment.accounting_start
+        ):
+            raise ValueError(
+                "Historical intervals precede this local deployment; retained for audit only"
+            )
         if end > datetime.now(UTC) - timedelta(minutes=2):
             raise ValueError("Interval is not closed beyond the telemetry grace period")
         existing = await self.repository.interval(session, community_id, start, end)
@@ -404,6 +413,8 @@ class CommunitySettlementService:
 
     async def verify_funding(self, session, allocation, block="latest"):
         batch = await session.get(SettlementBatch, allocation.batch_id)
+        if batch.archived:
+            return "ARCHIVED"
         _, _, _, _, vault = await self.contracts(session, batch.community_id)
         state = vault.functions.allocations(
             Web3.to_bytes(hexstr=allocation.chain_allocation_id)

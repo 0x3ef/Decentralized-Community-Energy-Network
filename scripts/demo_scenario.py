@@ -4,6 +4,7 @@ import json
 import os
 import time
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
@@ -14,6 +15,40 @@ from src.protocol.deployment import Deployment, artifacts_at, save_json
 from web3 import Web3
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def new_interval(now, baseline):
+    """Choose closed evidence after any recovery cutoff; never reuse old energy."""
+    end = (now - timedelta(minutes=2)).replace(second=0, microsecond=0)
+    end = end.replace(minute=end.minute // 15 * 15)
+    start = end - timedelta(minutes=15)
+    if baseline.get("accounting_start"):
+        cutoff = datetime.fromisoformat(baseline["accounting_start"])
+        if start < cutoff:
+            available = cutoff + timedelta(minutes=17)
+            raise ValueError(
+                f"No complete post-recovery interval yet. Rerun after {available.isoformat()} (UTC); old intervals will not be replayed"
+            )
+    return start, end
+
+
+def counter_data(baseline, code, producer, fraction):
+    previous = baseline.get("meters", {}).get(code, {})
+    deltas = {
+        "grid_export": 5 if producer else 0,
+        "grid_import": 0 if producer else 3,
+        "consumption": 0 if producer else 3,
+    }
+    return {
+        field: str(
+            Decimal(previous.get(counter, 0)) / 1000 + deltas[counter] * fraction
+        )
+        for field, counter in (
+            ("grid_export_energy_kwh", "grid_export"),
+            ("grid_import_energy_kwh", "grid_import"),
+            ("consumption_energy_kwh", "consumption"),
+        )
+    }
 
 
 def run():
@@ -82,16 +117,17 @@ def run():
         raise TimeoutError("Not confirmed: " + label)
 
     journal_path = directory / "scenario.json"
+    baseline_path = directory / "scenario-baseline.json"
+    baseline = json.loads(baseline_path.read_text()) if baseline_path.exists() else {}
     if journal_path.exists():
         journal = json.loads(journal_path.read_text())
         if journal["community_id"] != cid:
             raise ValueError("Scenario journal belongs to another community")
     else:
-        end = datetime.now(UTC).replace(second=0, microsecond=0)
-        end = end.replace(minute=end.minute // 15 * 15) - timedelta(minutes=15)
+        start, end = new_interval(datetime.now(UTC), baseline)
         journal = {
             "community_id": cid,
-            "interval_start": (end - timedelta(minutes=15)).isoformat(),
+            "interval_start": start.isoformat(),
             "interval_end": end.isoformat(),
             "actions": {},
         }
@@ -161,12 +197,20 @@ def run():
         publisher.loop_start()
         messages = []
         try:
-            for seq, at in enumerate(
-                (journal["interval_start"], journal["interval_end"]), 1
+            warmup = (
+                datetime.fromisoformat(journal["interval_start"])
+                - timedelta(seconds=15)
+            ).isoformat()
+            for seq, (at, fraction) in enumerate(
+                (
+                    (warmup, 0),
+                    (journal["interval_start"], 0),
+                    (journal["interval_end"], 1),
+                ),
+                1,
             ):
                 for index, number in enumerate((1, 2)):
                     entry = registry[f"SM-MS-{number:03d}-001"]
-                    f = seq - 1
                     message = {
                         "schema_version": "2.0",
                         "message_id": str(uuid5(NAMESPACE_URL, f"{cid}:{at}:{number}")),
@@ -195,11 +239,9 @@ def run():
                                 "device_id",
                             ]
                         },
-                        "data": {
-                            "grid_export_energy_kwh": 5 * f if index == 0 else 0,
-                            "grid_import_energy_kwh": 3 * f if index == 1 else 0,
-                            "consumption_energy_kwh": 3 * f if index == 1 else 0,
-                        },
+                        "data": counter_data(
+                            baseline, f"SM-MS-{number:03d}-001", index == 0, fraction
+                        ),
                     }
                     messages.append(message)
             invalid = {

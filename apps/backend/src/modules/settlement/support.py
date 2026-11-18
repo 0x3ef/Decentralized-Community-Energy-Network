@@ -41,6 +41,8 @@ class GovernanceService:
             batch = await session.get(SettlementBatch, payload.batch_id)
             if not batch or batch.community_id != community_id:
                 raise LookupError("Batch not found in this community")
+            if batch.archived:
+                raise ValueError("Archived local-chain batch cannot be finalized again")
             _, _, _, settlement, _ = await chain.service.contracts(
                 session, community_id
             )
@@ -259,6 +261,10 @@ class NativeTransactionService:
             await session.exec(
                 select(NativeWalletTransaction).where(
                     NativeWalletTransaction.chain_id == deployment.chain_id,
+                    NativeWalletTransaction.archived.is_(False),
+                    NativeWalletTransaction.chain_genesis.in_(
+                        [Web3.to_hex(chain.web3.eth.get_block(0).hash), ""]
+                    ),
                     NativeWalletTransaction.transaction_hash
                     == payload.transaction_hash,
                 )
@@ -270,11 +276,14 @@ class NativeTransactionService:
             or row.action != payload.action
         ):
             raise PermissionError("Transaction already linked to another operation")
+        if row and row.archived:
+            raise ValueError("Archived transaction belongs to a previous local chain")
         if not row:
             row = NativeWalletTransaction(
                 community_id=community_id,
                 user_id=user.uid,
                 chain_id=deployment.chain_id,
+                chain_genesis=Web3.to_hex(chain.web3.eth.get_block(0).hash),
                 transaction_hash=payload.transaction_hash,
                 action=payload.action,
             )

@@ -441,3 +441,100 @@ async def test_governed_bootstrap_mqtt_native_lifecycle_is_idempotent(
         w3.provider.make_request(
             "anvil_setCode", [demo["registry"], Web3.to_hex(registry_code)]
         )
+
+    # Explicit lost-chain recovery retains EVERY primary key, including financial
+    # history, and does not recreate the old SUN, payment or retirement balances.
+    from fastapi import HTTPException
+    from sqlmodel import SQLModel
+    from src.modules.community.native_routes import balances
+    from src.modules.settlement.models import (
+        LocalChainRecovery,
+        NativeWalletTransaction,
+        SettlementBatch,
+    )
+    from src.modules.settlement.routes import reconcile, retry_job, statement
+    from src.protocol.local_recovery import recover
+
+    deposit = vault.events.Deposited().get_logs(from_block=0)[0]
+    async with AsyncSessionFactory() as db:
+        db.add(
+            NativeWalletTransaction(
+                community_id=cid,
+                user_id=UUID(b["user_id"]),
+                chain_id=31337,
+                transaction_hash=Web3.to_hex(deposit.transactionHash),
+                action="deposit",
+                status="CONFIRMED",
+            )
+        )
+        await db.commit()
+        original_keys = {
+            table.name: set((await db.exec(select(*table.primary_key.columns))).all())
+            for table in SQLModel.metadata.sorted_tables
+        }
+        preserved_hash = (await db.get(User, UUID(a["user_id"]))).password_hash
+    for field in ("registry", "timelock", "sun", "settlement", "vault"):
+        w3.provider.make_request("anvil_setCode", [demo[field], "0x"])
+    async with AsyncSessionFactory() as db:
+        actor = await db.get(User, UUID(a["user_id"]))
+        with pytest.raises(HTTPException) as unavailable:
+            await balances(cid, actor, db)
+        assert unavailable.value.status_code == 503
+    (tmp_path / "deployment.json").rename(tmp_path / "old-deployment.json")
+    restored = await recover(
+        AsyncSessionFactory,
+        w3,
+        artifacts,
+        tmp_path,
+        "local-only-password",
+        "local-device-key-" + "x" * 40,
+    )
+    async with AsyncSessionFactory() as db:
+        for table in SQLModel.metadata.sorted_tables:
+            after = set((await db.exec(select(*table.primary_key.columns))).all())
+            assert original_keys[table.name] <= after, table.name
+        historical = await db.get(SettlementBatch, batch.id)
+        assert historical.archived and historical.status == "RECONCILIATION_REQUIRED"
+        recovered_user = await db.get(User, UUID(a["user_id"]))
+        assert recovered_user.password_hash == preserved_hash
+        assert (
+            await db.exec(
+                select(LocalChainRecovery).where(LocalChainRecovery.community_id == cid)
+            )
+        ).one().status == "COMPLETED"
+        producer = await db.get(User, UUID(a["user_id"]))
+        consumer = await db.get(User, UUID(b["user_id"]))
+        wallet = await balances(cid, producer, db)
+        assert wallet["sun_units"] == wallet["earnings_wei"] == "0"
+        current = await statement(cid, consumer, db)
+        assert current.retired_wh == 0 and current.unsettled_due_wei == "0"
+        for operation in (
+            lambda: reconcile(cid, batch.id, producer, db),
+            lambda: retry_job(cid, batch.id, job_id, producer, db),
+        ):
+            with pytest.raises(HTTPException) as archived:
+                await operation()
+            assert archived.value.status_code == 409
+        with pytest.raises(ValueError, match="Historical intervals"):
+            await NativeSettlementChain(w3).service.calculate_interval(db, cid, start)
+        with pytest.raises(ValueError, match="requires reconciliation"):
+            await NativeSettlementChain(w3).function(
+                db, await db.get(OutboxEvent, job_id)
+            )
+    assert (
+        w3.eth.contract(address=restored["sun"], abi=artifacts["SUNToken"]["abi"])
+        .functions.totalSupply()
+        .call()
+        == 0
+    )
+    assert (
+        await recover(
+            AsyncSessionFactory,
+            w3,
+            artifacts,
+            tmp_path,
+            "local-only-password",
+            "local-device-key-" + "x" * 40,
+        )
+        == restored
+    )

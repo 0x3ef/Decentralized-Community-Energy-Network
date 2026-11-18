@@ -188,7 +188,10 @@ message. Scoped Ruff, Compose configuration validation and whitespace checks pas
 This verifies local transport recovery; it does not identify the cause of a remote
 user's broker disconnection or establish a new full financial scenario result.
 
-## Named-volume persistence and isolated recovery follow-up
+## Historical named-volume persistence and isolated recovery follow-up
+
+The following describes an earlier implementation. The current same-database
+lifecycle below supersedes its isolated replacement script.
 
 The earlier integration persistence probe used a host-directory bind mount. It
 passed that check but did not exercise a newly created Docker named volume. A
@@ -221,7 +224,7 @@ rerun as part of this infrastructure correction.
 
 ## Same-database recommissioning and test isolation
 
-`make repair-demo` now supports an unused local deployment whose registry code is
+The earlier `make repair-demo` implementation supported an unused local deployment whose registry code was
 missing while retaining the existing PostgreSQL database and private identities.
 The integrated governed MQTT test preserves an existing address, password hash and
 historical telemetry row, recreates the local contracts, verifies cursor rebinding,
@@ -240,3 +243,39 @@ Markdown lint, local links/schema checks and whitespace validation passed.
 This does not claim that a remote user's repair was already executed. The command
 creates a private SQL backup before attempting changes and refuses to reuse any
 recorded financial entitlement on a replacement chain.
+
+## Current local deployment lifecycle
+
+The Docker/script correction supersedes the older isolated recovery flow above.
+It does not modify Solidity contracts or frontend behavior. Recovery metadata and
+backend guards exist only to retain the same PostgreSQL database while preventing
+lost-chain records from being replayed on replacement contracts.
+
+Executed locally:
+
+- The complete stack recovered a lost local deployment on the SAME Compose
+  project and SQL volume, then reached `/ready` with all components ready and
+  accepted fresh registered simulator telemetry.
+- The private custom SQL dump was restored into a disposable inspection database.
+  All original primary keys across 44 SQLModel tables remained present in the
+  active database; password hashes, home ownership/addresses and historical
+  telemetry payloads matched the backup.
+- Named-volume Anvil checks retained genesis, contract bytecode, old transaction
+  receipts, SUN balance and signer nonce across forced termination and restart.
+  A corrupt primary checkpoint fell back to the previous completed checkpoint.
+  Genesis identity remained stable across repeated restarts; resumed block mining
+  follows wall time instead of the original genesis timestamp.
+- An actual stale-network reproduction started again through the lifecycle helper
+  without deleting any volumes; unit regressions also cover the retry path.
+- The post-recovery finite scenario completed NEW 5 kWh issuance, 3 kWh delivery,
+  0.003 test ETH settlement/withdrawal and 3 SUN retirement. Previous financial
+  rows remained archived and were not reused as current balances.
+- The IoT suite passed 95 tests at 88.18% coverage. Dependency layers for runtime
+  images are pinned and separated from development tools and source copies.
+
+The final backend suite passed 80 tests. It covers fresh migrations, unchanged record identities through
+recovery, archived-operation refusal, wrong-network/credential guards, preserved
+original Compose projects, failed/low-space atomic checkpoint writes, and cleanup
+that removes compiler artifacts without calling Docker or touching stored data.
+These are local checks; no remote user's deployment or Sepolia deployment is
+claimed as completed by this work.

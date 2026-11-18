@@ -3,7 +3,7 @@
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import select
 from src.core.db import get_session
 from src.modules.auth.dependencies import get_current_user
@@ -172,7 +172,7 @@ async def claims(
             vault.functions.deliveredEnergyByNode(
                 binary(batch.chain_batch_id), key(row.node_id)
             ).call(block_identifier=height)
-            if row.kind == 1
+            if row.kind == 1 and not batch.archived
             else 0
         )
         result.append(
@@ -180,7 +180,8 @@ async def claims(
                 **row.model_dump(),
                 chain_meter_id=Web3.to_hex(key(device.device_id)),
                 chain_node_id=Web3.to_hex(key(row.node_id)),
-                retirement_eligible=row.kind == 1
+                retirement_eligible=not batch.archived
+                and row.kind == 1
                 and delivered >= row.energy_wh
                 and row.status != "RETIRED",
             )
@@ -201,6 +202,7 @@ async def statement(community_id: UUID, user: User, session: Session):
             .join(SettlementBatch, SettlementBatch.id == IntervalAllocation.batch_id)
             .where(
                 SettlementBatch.community_id == community_id,
+                SettlementBatch.archived.is_(False),
                 (IntervalAllocation.producer_id == user.uid)
                 | (IntervalAllocation.consumer_id == user.uid),
             )
@@ -212,6 +214,7 @@ async def statement(community_id: UUID, user: User, session: Session):
             .join(SettlementBatch, SettlementBatch.id == SettlementClaim.batch_id)
             .where(
                 SettlementBatch.community_id == community_id,
+                SettlementBatch.archived.is_(False),
                 SettlementClaim.user_id == user.uid,
                 SettlementClaim.kind == 1,
                 SettlementClaim.status == "RETIRED",
@@ -311,8 +314,13 @@ async def operations(
     "/{community_id}/settlements/{batch_id}/reconcile", response_model=BatchView
 )
 async def reconcile(community_id: UUID, batch_id: UUID, user: User, session: Session):
-    await batch_access(session, community_id, batch_id, user)
+    batch = await batch_access(session, community_id, batch_id, user)
     await access(session, community_id, user, True)
+    if batch.archived:
+        raise HTTPException(
+            409,
+            "Archived deployment history cannot be reconciled onto a replacement chain",
+        )
     chain = NativeSettlementChain()
     await chain.service.repository.lock(session, f"native-reconcile:{community_id}")
     await chain.audit_native(session, community_id)
@@ -374,8 +382,10 @@ async def sync_membership(community_id: UUID, user: User, session: Session):
 async def retry_job(
     community_id: UUID, batch_id: UUID, job_id: UUID, user: User, session: Session
 ):
-    await batch_access(session, community_id, batch_id, user)
+    batch = await batch_access(session, community_id, batch_id, user)
     await access(session, community_id, user, True)
+    if batch.archived:
+        raise HTTPException(409, "Archived deployment history cannot be replayed")
     job = (
         await session.exec(
             select(OutboxEvent).where(OutboxEvent.id == job_id).with_for_update()

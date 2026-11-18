@@ -36,8 +36,43 @@ def identifier(value):
     return uuid5(NAMESPACE_URL, "solar-governed-demo:v1:" + value)
 
 
+def local_accounts(device_key):
+    return [
+        Account.from_key(
+            hmac.new(
+                device_key.encode(), f"local-wallet:{role}".encode(), hashlib.sha256
+            ).digest()
+        )
+        for role in ("governor", "1", "2", "3", "4", "5")
+    ]
+
+
+async def verify_existing_identity(factory, accounts, password):
+    """Validate original credentials before any SQL mutation or local funding."""
+    async with factory() as db:
+        for number, account in enumerate(accounts[1:], 1):
+            user = await db.get(User, identifier(f"user:{number}"))
+            if user and not verify_password(password, user.password_hash):
+                raise ValueError(
+                    "Restore the original SEED_PASSWORD; existing login credentials will not be overwritten"
+                )
+            wallet = await db.get(Wallet, identifier(f"wallet:{number}"))
+            if wallet and wallet.address.lower() != account.address.lower():
+                raise ValueError(
+                    "Restore the original SEED_DEVICE_KEY; existing wallet ownership will not be overwritten"
+                )
+
+
 async def bootstrap(
-    factory, web3, artifacts, output, password, device_key, *, recommission=False
+    factory,
+    web3,
+    artifacts,
+    output,
+    password,
+    device_key,
+    *,
+    recommission=False,
+    recovering=False,
 ):
     if Config.ENVIRONMENT != "development" or web3.eth.chain_id not in (31337, 1337):
         raise ValueError("Demo bootstrap is restricted to development Anvil")
@@ -50,7 +85,11 @@ async def bootstrap(
         raise ValueError(
             "Set SEED_PASSWORD (12+), SEED_DEVICE_KEY (32+) and the dedicated backend oracle key"
         )
-    if recommission:
+    if recovering:
+        from src.protocol.local_recovery import assert_pending_recovery
+
+        await assert_pending_recovery(factory, web3)
+    elif recommission:
         from src.protocol.recommission import assert_recommission_allowed
 
         async with factory() as db:
@@ -61,40 +100,17 @@ async def bootstrap(
     output.mkdir(parents=True, exist_ok=True, mode=0o700)
     # Derive isolated local fixtures without embedding or logging a private key.
     # Existing linked Anvil accounts are never claimed or overwritten.
-    local_accounts = [
-        Account.from_key(
-            hmac.new(
-                device_key.encode(), f"local-wallet:{role}".encode(), hashlib.sha256
-            ).digest()
-        )
-        for role in ("governor", "1", "2", "3", "4", "5")
-    ]
-    governor = local_accounts[0].address
-    owners = [account.address for account in local_accounts[1:]]
-    if recommission:
-        from src.protocol.recommission import RecommissionError
-
-        async with factory() as db:
-            for number, owner in enumerate(owners, 1):
-                existing_user = await db.get(User, identifier(f"user:{number}"))
-                if existing_user and not verify_password(
-                    password, existing_user.password_hash
-                ):
-                    raise RecommissionError(
-                        "Restore the original SEED_PASSWORD; existing login credentials will not be overwritten"
-                    )
-                existing_wallet = await db.get(Wallet, identifier(f"wallet:{number}"))
-                if existing_wallet and existing_wallet.address.lower() != owner.lower():
-                    raise RecommissionError(
-                        "Restore the original SEED_DEVICE_KEY; existing wallet ownership will not be overwritten"
-                    )
+    accounts = local_accounts(device_key)
+    governor = accounts[0].address
+    owners = [account.address for account in accounts[1:]]
+    await verify_existing_identity(factory, accounts, password)
     oracle = Account.from_key(Config.BACKEND_PRIVATE_KEY).address
-    if oracle.lower() in {x.address.lower() for x in local_accounts}:
+    if oracle.lower() in {x.address.lower() for x in accounts}:
         raise ValueError(
             "Backend oracle must be separate from governance and participants"
         )
     fresh = not (output / "deployment.json").exists()
-    for account in local_accounts:
+    for account in accounts:
         web3.provider.make_request("anvil_impersonateAccount", [account.address])
         if fresh:
             web3.provider.make_request(
@@ -175,7 +191,7 @@ async def bootstrap(
         if (
             community.registry_address
             and community.registry_address.lower() != registry.address.lower()
-            and not recommission
+            and not (recommission or recovering)
         ):
             raise ValueError(
                 "Existing demo registry differs; refusing to overwrite accounting"
@@ -419,7 +435,7 @@ async def bootstrap(
                     vault_address=vault.address,
                 )
             )
-        elif recommission:
+        elif recommission or recovering:
             native.chain_id = web3.eth.chain_id
             native.sun_address = sun.address
             native.settlement_address = settlement.address

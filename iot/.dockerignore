@@ -7,3 +7,9 @@ coverage.xml
 *.log
 *.egg-info
 state/
+.venv/
+venv/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/

@@ -2,6 +2,10 @@
 services:
   simulator:
     profiles: [simulation]
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: '10m', max-file: '3'}
     build:
       context: ../../iot
       dockerfile: Dockerfile
@@ -22,10 +26,12 @@ services:
       HOME_CATALOGUE_FILE: /run/simulation/home-catalogue.json
       CHECKPOINT_PATH: /state/simulator.json
       # The registry references env binding names, never embedded credentials.
-    env_file: ${SIMULATOR_ENV_FILE:?Set the path to a private simulator environment file}
+    env_file:
+      - path: ${SIMULATOR_ENV_FILE:-../../.run/demo/simulator.env}
+        required: false
     volumes:
-      - ${SIMULATOR_REGISTRY_FILE:?Set the path to the provisioned registry}:/run/simulation/registry.json:ro
-      - ${SIMULATOR_CATALOGUE_FILE:?Set the path to the approved home catalogue}:/run/simulation/home-catalogue.json:ro
+      - ${SIMULATOR_REGISTRY_FILE:-../../.run/demo/registry.json}:/run/simulation/registry.json:ro
+      - ${SIMULATOR_CATALOGUE_FILE:-../../.run/demo/home-catalogue.json}:/run/simulation/home-catalogue.json:ro
       - simulation_state:/state
       - ${SIMULATOR_CA_FILE:-/etc/ssl/certs/ca-certificates.crt}:/run/simulation/ca.crt:ro
     depends_on: [mosquitto, subscriber]

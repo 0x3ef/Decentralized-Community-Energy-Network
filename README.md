@@ -49,9 +49,8 @@ uses its own pinned Anvil image.
 ./scripts/install_dev.sh
 source .venv/bin/activate
 make setup
-make contracts-build
-make demo
-make demo-scenario
+make simulate
+make doctor
 ```
 
 Open **[http://127.0.0.1:8080](http://127.0.0.1:8080)**. Use `govdemo1@solar.local` (producer/operator) or
@@ -59,8 +58,12 @@ Open **[http://127.0.0.1:8080](http://127.0.0.1:8080)**. Use `govdemo1@solar.loc
 `infrastructure/docker/.env`. Never commit that file or import local fixture keys
 into a public-network account.
 
-`make setup` starts services and runs migrations; `make demo` separately deploys and
-commissions the local community. The scenario has been executed locally with
+`make setup` builds, migrates, commissions and starts the complete local application.
+`make simulate` includes the full application and continuous telemetry. For corrupt
+or lost local-chain state, `make recover` retains the SAME database and credentials,
+archives historical chain records and deploys fresh local contracts without replaying
+payments. `make backup` exports SQL; `make down` retains volumes; `make clean` removes
+compiler artifacts only. The optional `make demo-scenario` has been executed with
 5 kWh injection, 3 kWh allocation, 0.003 ETH settlement and 3 SUN retirement.
 [Getting started](docs/getting-started.md) covers verification, continuous simulation,
 wallet setup, credentials and the distinction between bootstrap and plain seed data.

@@ -210,3 +210,6 @@ class NativeDeployment(SQLModel, table=True):
     sun_address: str = Field(max_length=42)
     settlement_address: str = Field(max_length=42, unique=True)
     vault_address: str = Field(max_length=42, unique=True)
+    accounting_start: datetime | None = Field(
+        default=None, sa_type=DateTime(timezone=True)
+    )

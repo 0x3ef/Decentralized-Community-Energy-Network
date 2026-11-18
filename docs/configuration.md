@@ -172,9 +172,9 @@ public JSON or checkpoint files.
 
 | Variable | Default / requirement | Purpose |
 | --- | --- | --- |
-| `COMPOSE_PROJECT_NAME` | `solar-prototype` through the Compose file; recovery writes a unique project name into the private backend env file | Selects isolated containers/volumes; shell overrides must be unset before recovery |
+| `COMPOSE_PROJECT_NAME` | `solar-prototype`, or the ORIGINAL project already in the private env file | Selects the existing volumes; lifecycle/recovery never change it and conflicting shell overrides are refused |
 | `CLOUD_CA_BUNDLE` | `/etc/ssl/certs/ca-certificates.crt` | Combined CA bundle for BuildKit and runtime trust mounts |
-| `SIMULATOR_ENV_FILE`, `SIMULATOR_REGISTRY_FILE`, `SIMULATOR_CATALOGUE_FILE` | Required by simulation overlay | Host paths; `make demo` writes bindings in `.run/demo/compose.env` |
+| `SIMULATOR_ENV_FILE`, `SIMULATOR_REGISTRY_FILE`, `SIMULATOR_CATALOGUE_FILE` | Default to repository `.run/demo` files | Optional host-path overrides; lifecycle no longer requires `.run/demo/compose.env` |
 | `SIMULATOR_MQTT_CLIENT_ID` | `solar-simulator` | Unique simulator session identity; keep distinct from concurrent gateways and align its status-topic ACL |
 | `SIMULATOR_MQTT_PORT`, `SIMULATOR_MQTT_TLS` | `1883`, `false` | Simulation overlay broker mode |
 | `SIMULATOR_CA_FILE` | System CA bundle | Public CA mounted into simulator |

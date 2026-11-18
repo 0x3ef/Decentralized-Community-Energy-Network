@@ -41,8 +41,18 @@ class CommunityChain:
         )
 
     def contract(self, name: str, address: str) -> Contract:
+        from fastapi import HTTPException
+        from requests.exceptions import RequestException
+
+        address = Web3.to_checksum_address(address)
+        try:
+            deployed = self.web3.eth.get_code(address)
+        except RequestException:
+            raise HTTPException(503, "Blockchain RPC unavailable") from None
+        if not deployed:
+            raise HTTPException(503, "Blockchain deployment unavailable; recovery required")
         return self.web3.eth.contract(
-            address=Web3.to_checksum_address(address),
+            address=address,
             abi=json.loads((ABI_ROOT / f"{name}.json").read_text()),
         )
 

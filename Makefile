@@ -6,35 +6,40 @@ COMPOSE_FILE := $(ROOT_DIR)/infrastructure/docker/compose.prototype.yml
 COMPOSE      := docker compose --env-file $(ROOT_DIR)/infrastructure/docker/.env -f $(COMPOSE_FILE)
 
 .PHONY: help setup recover-demo repair-demo up down logs ps build migrate seed test test-contracts test-iot \
-        test-backend lint format typecheck contracts-deploy clean
+        test-backend lint format typecheck contracts-deploy clean recover backup doctor demo simulate
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
 	  | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 setup: ## Bootstrap the local environment
-	./scripts/setup.sh
+	python scripts/stack.py setup
 
-repair-demo: ## Recommission unused missing local contracts while preserving this database
-	python scripts/bootstrap_demo.py --recommission
+repair-demo recover-demo: recover ## Compatibility aliases: recover on the SAME database
 
-recover-demo: ## Archive a broken local demo and commission an isolated replacement
-	python scripts/recover_local_demo.py --new-demo
+recover: ## Recover lost local-chain contracts; retain SQL rows and archive old financial history
+	python scripts/stack.py recover
+
+backup: ## Create a private verified SQL backup without changing databases
+	python scripts/stack.py backup
+
+doctor: ## Inspect containers, disk, blockchain deployment and application readiness
+	python scripts/stack.py doctor
 
 up: ## Start the full stack
-	$(COMPOSE) up -d
+	python scripts/stack.py up
 
 down: ## Stop the stack (keep volumes)
-	$(COMPOSE) down
+	python scripts/stack.py down
 
 logs: ## Tail logs from all services
-	$(COMPOSE) logs -f
+	python scripts/stack.py logs
 
 ps: ## Show container status
-	$(COMPOSE) ps
+	python scripts/stack.py ps
 
 build: ## Build all Docker images
-	$(COMPOSE) build
+	python scripts/stack.py build
 
 seed: ## Load ungoverned SQLModel fixtures into the running DB
 	./scripts/seed_db.sh
@@ -50,7 +55,7 @@ test-contracts: ## Run Foundry tests
 test-iot: ## Run iot unit tests
 	./scripts/test_iot.sh
 
-test-backend: ## Run backend unit tests in Docker
+test-backend: ## Run backend integration tests against isolated Docker services
 	./scripts/test_backend.sh
 
 lint: ## Run ruff on backend and iot
@@ -69,14 +74,13 @@ contracts-build: ## Compile reviewed contract artifacts
 	$(DEV_TOOLS)/node_modules/.bin/forge build --root contracts --use $(DEV_TOOLS)/solc-0.8.24
 
 demo: ## Commission deterministic governed local users, nodes and meters
-	python scripts/init_local_env.py
-	python scripts/bootstrap_demo.py
+	python scripts/stack.py up
 
 demo-scenario: ## Verify actual MQTT, automatic settlement, SUN retirement and earnings withdrawal
 	PYTHONPATH=apps/backend python scripts/demo_scenario.py
 
 simulate: ## Start the registered REALTIME MQTT simulator for the governed demo
-	$(COMPOSE) --env-file $(ROOT_DIR)/.run/demo/compose.env -f infrastructure/docker/compose.iot.yml --profile simulation up -d --build simulator
+	python scripts/stack.py simulate
 
 contracts-deploy: ## Run native Sepolia preflight; broadcasting is always explicit
 	@echo "scripts/deploy.sh COMMUNITY_UUID --network sepolia [--broadcast]"
@@ -87,7 +91,5 @@ test-frontend: ## Verify strict frontend types, lint, tests and production build
 test-browser: ## Start a fresh native fixture and run all real API browser journeys
 	cd apps/frontend && npm run test:e2e:all
 
-clean: ## Stop the stack and delete volumes + build artifacts
-	$(COMPOSE) down -v
-	rm -rf contracts/out contracts/cache contracts/broadcast
-	find . -type d -name __pycache__ -prune -exec rm -rf {} +
+clean: ## Remove compiler artifacts only; retain all SQL data, volumes and configuration
+	python scripts/stack.py clean

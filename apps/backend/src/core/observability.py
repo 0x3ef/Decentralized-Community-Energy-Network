@@ -126,8 +126,15 @@ async def readiness():
                 )
             )
             chain, height = web3.eth.chain_id, web3.eth.block_number
+            state = "ready" if chain == Config.CHAIN_ID else "wrong_chain"
+            if (
+                state == "ready"
+                and Config.COMMUNITY_REGISTRY_ADDRESS
+                and not web3.eth.get_code(Config.COMMUNITY_REGISTRY_ADDRESS)
+            ):
+                state = "missing_contracts"
             return {
-                "state": "ready" if chain == Config.CHAIN_ID else "wrong_chain",
+                "state": state,
                 "chain_id": chain,
                 "block_number": height,
                 "confirmation_blocks": Config.BLOCKCHAIN_CONFIRMATION_BLOCKS,

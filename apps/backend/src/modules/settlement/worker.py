@@ -50,7 +50,8 @@ class NativeSettlementWorker:
                         for batch in (
                             await session.exec(
                                 select(SettlementBatch).where(
-                                    SettlementBatch.community_id == community_id
+                                    SettlementBatch.community_id == community_id,
+                                    SettlementBatch.archived.is_(False),
                                 )
                             )
                         ).all():
@@ -61,6 +62,7 @@ class NativeSettlementWorker:
                                     NativeWalletTransaction.community_id
                                     == community_id,
                                     NativeWalletTransaction.status == "CONFIRMED",
+                                    NativeWalletTransaction.archived.is_(False),
                                 )
                             )
                         ).all():
@@ -81,6 +83,7 @@ class NativeSettlementWorker:
                     await session.commit()
                 async with factory() as session:
                     community = await session.get(EnergyCommunity, community_id)
+                    deployment = await session.get(NativeDeployment, community_id)
                     if community.status != "ACTIVE":
                         continue
                     starts = (
@@ -112,6 +115,11 @@ class NativeSettlementWorker:
                                 >= datetime.now(UTC)
                                 - timedelta(
                                     hours=Config.NATIVE_SETTLEMENT_LOOKBACK_HOURS
+                                ),
+                                EnergyInterval.interval_start
+                                >= (
+                                    deployment.accounting_start
+                                    or datetime(1970, 1, 1, tzinfo=UTC)
                                 ),
                             )
                             .distinct()

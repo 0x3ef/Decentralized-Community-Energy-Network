@@ -5,7 +5,7 @@ start at the repository root unless a block explicitly changes directory.
 
 ## Install prerequisites
 
-Use Linux, Python 3.12 or newer, Node.js 24, npm, Docker Engine with Compose v2,
+Use Linux, Python 3.12 or newer, Node.js 24, npm, Docker Engine with Compose 2.24 or newer,
 GNU Make, Git and curl. Python packages require a virtual environment. The
 [installer](../scripts/install_dev.sh) installs backend/IoT development dependencies,
 Foundry npm binaries at 1.7.1, Solidity 0.8.24 with checksum verification,
@@ -26,27 +26,26 @@ configured in managed environments; see [deployment](deployment.md).
 
 ```bash
 make setup
-make contracts-build
-make demo
 curl -fsS http://127.0.0.1:8000/health
 curl -fsS http://127.0.0.1:8000/ready
 curl -fsS http://127.0.0.1:8080/api/v1/openapi.json >/dev/null
 make ps
 ```
 
-`make setup` generates missing local JWT/oracle/seed credentials in the ignored,
-mode-0600 `infrastructure/docker/.env`, builds images and waits for dependencies.
-The `migrate` service applies `alembic upgrade head` before API/subscriber/worker
-startup. No revision generation or schema creation occurs in application startup.
-The setup command itself does not deploy contracts, seed users or start a simulator.
+`make setup` creates private local configuration only for a new installation,
+builds images serially, runs reviewed migrations, deploys/commissions the five
+contracts, and starts API, worker, subscriber and frontend. Contract artifacts are
+compiled when absent. `make up` resumes the same installation; `make simulate`
+starts the complete application and the registered simulator. `make demo` is a
+compatibility alias for normal startup, not a separate deployment workflow.
 
-`make demo` separately commissions a deterministic SQLModel community, five
-participant users/homes, fifteen simulated devices and a separate governance
-fixture. It deploys timelock, registry, SUN, settlement and vault contracts, then
-uses actual governance transactions to approve policy, membership, nodes and
-meters. The backend oracle has distinct local keys and limited authority.
-Rerunning checks identity/deployment/credentials and preserves existing balances,
-passwords, revocations and unrelated records; conflicts stop for review.
+The canonical SQLModel fixture includes five participant users/homes, fifteen
+simulated devices and a separate governance account. Actual timelock transactions
+approve policy, membership, nodes and meters. Startup checks identities and
+credentials before funding fixtures and preserves passwords, revocations, balances
+and unrelated records. Keep the original ignored `.env` and `.run/demo` files.
+If contracts or node state were lost, use `make recover`, which retains the SAME
+PostgreSQL database and archives previous financial history without replaying it.
 
 ## Open the application and connect a local wallet
 
@@ -148,8 +147,8 @@ contract addresses and financial projections cannot safely survive an independen
 chain reset. Destructive cleanup is intentionally outside normal startup.
 Operational failures and Sepolia configuration belong in [deployment](deployment.md).
 
-If local contracts disappeared and there is no financial history, use
-[repair on the same database](deployment.md#repair-unused-local-contracts-on-the-same-database).
-For a separate fresh demonstration with archived historical data, use the
-[isolated recovery workflow](deployment.md#recover-a-local-demo-after-lost-anvil-state).
-Neither path silently reuses old financial entitlements.
+For lost or corrupt local-chain state, use [same-database recovery](deployment.md#recover-a-local-demo-after-lost-anvil-state).
+`make recover` takes a verified SQL backup and retains all records; financial
+history from the lost chain remains archived and is not recreated as new balances.
+Use `make doctor` to inspect the active installation and `make backup` for a private
+SQL archive. `make clean` removes compiler artifacts only.
