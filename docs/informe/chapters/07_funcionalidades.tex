@@ -1,39 +1,51 @@
 \section{Funcionalidades de la plataforma}
-\subsection{Acceso, wallet y permisos}
-El usuario puede registrarse e iniciar sesión; la aplicación conserva una sesión HTTP separada de MetaMask. La vinculación de wallet utiliza un mensaje con usuario, dirección y nonce de un solo uso. Firmarlo prueba control de la cuenta y no deposita activos ni concede autoridad de gobernanza.
+\subsection{Acceso y wallet}
+La aplicación permite crear una cuenta e iniciar sesión. La wallet se conecta por separado y se vincula al usuario mediante la firma de un mensaje con un código de un solo uso. El servidor comprueba esa firma y registra la dirección del participante.
 
-La sesión HTTP, la cuenta seleccionada en la extensión y la wallet vinculada al usuario son identidades que la aplicación comprueba de forma independiente. La operación sobre fondos propios requiere correspondencia de dirección y red. Los permisos del contrato se consultan en cadena.
+Las acciones sobre fondos utilizan la wallet vinculada al usuario. La interfaz muestra la dirección, la red y el estado de verificación. Los permisos de gobernanza se consultan en los contratos.
 
-
-\subsection{Mapa funcional de la interfaz}
-\begin{longtable}{L{.23\linewidth}L{.40\linewidth}L{.26\linewidth}}
-\caption{Funciones visibles y sus límites.}\label{tab:funcionalidades}\\
-\toprule Pantalla & Operación implementada & Límite que debe comunicarse \\ \midrule\endfirsthead
-\toprule Pantalla & Operación implementada & Límite que debe comunicarse \\ \midrule\endhead
-Inicio & Resumen de generación, consumo, exportación, SUN, obligaciones e ingresos. & Una métrica de energía no confirma emisión o pago.\\
-Hogares & Registro, consulta y edición de ubicación, zona horaria, capacidad y batería. & No activa por sí mismo un nodo ni autoriza medidores.\\
-Dispositivos & Registro pendiente, selección por hogar, lectura reciente, salud y calidad. & La publicación necesita configuración y autorización; registrar no inicia un sensor físico.\\
-Energía & Selección de hogar/periodo, gráficas y registro de intervalos. & Los estados rechazados o incompletos no se convierten manualmente en elegibles.\\
-Comunidad & Propuestas, solicitudes de membresía, reglas y nodos. & No hay un directorio público completo ni activación automática.\\
-Créditos SUN & Saldos y registros de crédito vinculados al intervalo. & \code{PENDING} no equivale a tokens emitidos.\\
-Liquidación & Lotes, métricas, asignaciones, financiación, pruebas y operaciones de operador. & \textit{Con fondos} no equivale a \code{SETTLED}.\\
-Gobernanza & Preparar y firmar acciones de registro y finalización mediante timelock. & Exige permisos en cadena, además de la sesión de la app.\\
-Depósitos y retiros & Depósito ETH, autorización/escrow SUN y retiros de fondos e ingresos. & Wallet, custodia, reserva e ingreso son saldos diferentes.\\
-Compensación & Seleccionar consumo entregado, autorizar SUN y registrar retiro por quema. & No entrega otro pago ETH ni cambia una factura oficial.\\
-Transacciones & Actividad local del navegador y registro propio del servidor. & El journal local no es el ledger canónico ni un historial universal entre dispositivos.\\
-Configuración & Estado de servicios, perfil consultable, idioma/zona y capacidades. & No ofrece edición completa del perfil.\\
+\subsection{Pantallas y operaciones}
+\begin{longtable}{L{.23\linewidth}L{.67\linewidth}}
+\caption{Funciones de las pantallas de la aplicación}\label{tab:funcionalidades}\\
+\toprule Pantalla & Funciones \\ \midrule\endfirsthead
+\toprule Pantalla & Funciones \\ \midrule\endhead
+Inicio & Consultar generación, consumo, exportación, SUN, obligaciones e ingresos.\\
+Hogares & Registrar, consultar y editar ubicación, zona horaria, capacidad solar y batería.\\
+Dispositivos & Registrar equipos, seleccionarlos por hogar y consultar lecturas, salud y calidad.\\
+Energía & Filtrar por hogar y periodo, revisar gráficas y consultar intervalos.\\
+Comunidad & Consultar reglas y nodos, presentar propuestas y solicitar membresía.\\
+Créditos SUN & Consultar cantidades, estados de emisión y relación con el intervalo de origen.\\
+Liquidación & Revisar lotes, asignaciones, financiación y pruebas; consultar las tareas del operador.\\
+Gobernanza & Preparar, programar y ejecutar acciones de la cuenta autorizada.\\
+Depósitos y retiros & Depositar ETH, autorizar y depositar SUN, retirar activos disponibles y cobrar ingresos.\\
+Compensación & Seleccionar consumo entregado, autorizar SUN y registrar su quema.\\
+Transacciones & Consultar la actividad de la sesión y el registro de operaciones del servidor.\\
+Configuración & Consultar el perfil, el estado de servicios y la zona horaria utilizada.\\
 \bottomrule
 \end{longtable}
 
-\subsection{Operaciones que requieren firma}
-Las acciones \code{approve_sun} y \code{escrow_sun} son diferentes: la primera concede un allowance al vault y la segunda transfiere SUN a custodia. De modo análogo, \code{approve_retirement} autoriza a CommunitySettlement y \code{retire} quema SUN por consumo. \code{deposit} mueve ETH nativo al vault; \code{withdraw_earnings} cobra ingresos ya acreditados. Las etiquetas técnicas presentes en el historial no indican una nueva obligación de firmar cuando el estado ya es confirmado.
+\subsection{Operaciones del productor}
+El productor recibe SUN por la inyección aprobada. Para usarlos en la liquidación, autoriza una cantidad al contrato de custodia y luego ejecuta el depósito. La aplicación muestra los SUN en wallet, los disponibles en depósito y los reservados.
 
-La revisión previa muestra red, remitente, contrato, valor y argumentos. La API no dispone de la firma del usuario. Mantener esta intervención limita la automatización a tareas para las que existe una autoridad específica y evita que el servidor retire fondos de participantes.
+Cuando se ejecuta una asignación, el contrato acredita ETH al productor. Este ingreso aparece como reclamable y se envía a su wallet al firmar el retiro. También puede recuperar los SUN depositados que estén disponibles.
 
-\subsection{Estados que se deben interpretar separadamente}
-Un intervalo \code{FINALIZED} expresa el cierre de la medición. Un lote \code{FINALIZED} expresa aprobación del compromiso de evidencia. Un crédito \code{ISSUED} refleja emisión confirmada. Una asignación \code{SETTLED} refleja la entrega y reconocimiento financiero. Un consumo retirado refleja una quema válida contra entrega. Ninguno de esos nombres reemplaza a los otros.
+\subsection{Operaciones del consumidor}
+El consumidor consulta la energía que tiene asignada y su coste. Deposita ETH con un precio máximo permitido; el contrato reserva los fondos correspondientes a cada asignación. Al liquidarse, recibe SUN.
 
-La financiación \code{FUNDED} puede significar que una reserva ya existe o que hay recursos suficientes para intentar reservar. La ejecución sigue dependiendo de lote activo/finalizado y demás condiciones del protocolo. Una reserva consume disponibilidad: otros lotes pueden dejar una asignación sin recursos aunque la wallet conserve saldo.
+En Compensación selecciona el consumo entregado, autoriza el uso de los SUN y firma la operación que los quema. El registro resultante vincula esa cantidad con el consumo aprobado. El consumidor también puede retirar ETH disponible de su depósito.
 
-\subsection{Presentación de cantidades y acciones}
-Las cantidades SUN se presentan en unidades de token y en unidades base según el contexto técnico. Por ejemplo, \(108000000000000000\) unidades base equivalen a 0,108 SUN. La interfaz distingue la recuperación de tokens depositados, el cobro de ingresos y el retiro de créditos de circulación contra consumo. Cada acción tiene un propósito y una autorización específicos.
+\subsection{Gobernanza}
+La cuenta de gobernanza administra las autorizaciones de la comunidad y la finalización de lotes. La aplicación prepara la acción y la wallet firma su programación y ejecución. La finalización confirmada habilita el procesamiento de las emisiones correspondientes.
+
+\subsection{Revisión y firma}
+Antes de una operación, la aplicación presenta red, cuenta, contrato, valor y argumentos. La firma se realiza en MetaMask. Autorizar un gasto y transferir los activos son acciones separadas: \code{approve_sun} autoriza el depósito y \code{escrow_sun} lo ejecuta. Para el consumo, \code{approve_retirement} autoriza la quema y \code{retire} la registra.
+
+\subsection{Estados de la operación}
+El usuario puede seguir cuatro estados de negocio: intervalo calculado, lote aprobado, crédito emitido y asignación liquidada. El estado \code{FINALIZED} pertenece al cálculo o al lote según la pantalla; \code{ISSUED} identifica un crédito emitido y \code{SETTLED} una asignación liquidada.
+
+La financiación se consulta por separado. El estado \textit{Con fondos} indica que hay recursos suficientes o una reserva constituida. La entrega se confirma mediante el estado de liquidación.
+
+\subsection{Unidades y saldos}
+Un SUN representa un kWh de energía elegible aprobada. El token utiliza dieciocho decimales para registrar fracciones. Por ejemplo, una asignación de 0,108 kWh corresponde a 0,108 SUN.
+
+Los saldos de wallet, depósito, reserva e ingreso corresponden a ubicaciones y usos distintos de los activos. La consulta separada permite conocer qué cantidad puede depositarse, retirarse o utilizarse en una asignación.

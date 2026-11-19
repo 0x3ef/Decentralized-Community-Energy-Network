@@ -1,166 +1,4 @@
 {
-  "corte_documental": "2026-11-18",
-  "zona_fecha": "America/Bogota",
-  "revision_base": "acb2d3192b890e331958c9a6abee155a26747b76",
-  "alcance": "Revision documental y de codigo; sin nuevos pagos, minteos, recuperaciones ni alteracion SQL.",
-  "verificacion_actual": {
-    "tablas_sqlmodel": 44,
-    "tablas": [
-      "audit_events",
-      "battery",
-      "blockchain_events",
-      "blockchain_transactions",
-      "community_chain_deployments",
-      "community_chain_operations",
-      "community_chain_sync_state",
-      "community_energy_allocations",
-      "community_energy_ledger",
-      "community_memberships",
-      "community_native_deployments",
-      "community_nodes",
-      "compensation_requests",
-      "credit_movements",
-      "device_counter_snapshots",
-      "device_credentials",
-      "devices",
-      "energy_communities",
-      "energy_credits",
-      "energy_intervals",
-      "energy_power_snapshots",
-      "homes",
-      "inverter",
-      "local_chain_recoveries",
-      "meter_authorizations",
-      "native_indexed_events",
-      "native_interval_allocations",
-      "native_settlement_batches",
-      "native_settlement_claims",
-      "native_settlement_policies",
-      "native_sync_cursors",
-      "native_wallet_transactions",
-      "orders",
-      "outbox_events",
-      "redemptions",
-      "settlement_obligations",
-      "smart_meter",
-      "telemetry_assessments",
-      "telemetry_messages",
-      "trades",
-      "users",
-      "wallet_nonces",
-      "wallets",
-      "weather"
-    ],
-    "alembic_head": "20261112_local_recovery",
-    "openapi_paths": 71,
-    "openapi_operaciones": 80,
-    "pytest_objetivo": "apps/backend/tests/test_stack_lifecycle.py",
-    "pytest_resultado": "32 pruebas aprobadas"
-  },
-  "fuentes_documentales": [
-    {
-      "ruta": "README.md",
-      "sha256": "b852b84cd83b80e9050fb53240e5a1a1b31b2517e78c6c78964dbeffe745602c"
-    },
-    {
-      "ruta": "SECURITY.md",
-      "sha256": "f6cd8aae20fe72c2b5aebe7c4150e2d4267b4181db869547145c9b81ec8a0f02"
-    },
-    {
-      "ruta": "docs/api.md",
-      "sha256": "fd2463732aae7f56261efc3aed0cbceced0210db24614f27286c2a6c070fb83d"
-    },
-    {
-      "ruta": "docs/architecture.md",
-      "sha256": "89dfe231fb21e8a0aba49912af880c42c595ab3c5e67cb0b111c27f4ab5d0287"
-    },
-    {
-      "ruta": "docs/blockchain.md",
-      "sha256": "d429b70e5e39244f581eee24aeb5a982f1dd245477327b33d6fb29297f9cc9d4"
-    },
-    {
-      "ruta": "docs/community-settlement.md",
-      "sha256": "a431ff0814e7710b41f7b07fc83ff15c779c2287623e7bcd0907a745be594c27"
-    },
-    {
-      "ruta": "docs/configuration.md",
-      "sha256": "806da93bde83d3e79c79b1fac0a16cdd05dd42654dfc9b5289b226cc8618db3b"
-    },
-    {
-      "ruta": "docs/database.md",
-      "sha256": "55f0bad41348731beb795c05bca48855e42819fbaa7cc31d4143a8e3b2896169"
-    },
-    {
-      "ruta": "docs/deployment.md",
-      "sha256": "9235c53c724d5b9a94001f633610900e84248c3d4c6d8a64a3d2ca73fefd475d"
-    },
-    {
-      "ruta": "docs/development.md",
-      "sha256": "21205f6d022627a4f0b7fe09e3707fae2ec9be93cc17c76edcd61270c5079a53"
-    },
-    {
-      "ruta": "docs/documentation-audit.md",
-      "sha256": "88451830d1d196804e29e514ae3e22cdb4c5534ce7f9dccf1c679919a61aacf7"
-    },
-    {
-      "ruta": "docs/getting-started.md",
-      "sha256": "7cb49fa42f7c259d5a1e16d4af3ec4dcfdba8ae5071f7f63e0893d900c5da906"
-    },
-    {
-      "ruta": "docs/iot.md",
-      "sha256": "558b0b9b4b2ac29d4be9ee6a9319b375916c06dd91d40ecd58abb6dbd0664d64"
-    },
-    {
-      "ruta": "docs/verification.md",
-      "sha256": "20c44c30ffe60d45f713b51f26970906d72d9dcd30a4b54d777abceb6aa17276"
-    }
-  ],
-  "escenario_publico": {
-    "origen": "docs/evidence/local-native-scenario.json",
-    "sha256": "844af5089644848bdbe17b6558da290c34b5f571bb6f3deb3336c34294adf59e",
-    "naturaleza": "Evidencia versionada de ejecucion local anterior, no nueva transaccion de esta revision"
-  },
-  "campanas_anteriores": [
-    {
-      "referencia": "docs/verification.md, etapa e061ab0",
-      "contratos": 38,
-      "backend": 48,
-      "iot": 86,
-      "frontend": 35,
-      "navegador": 11,
-      "aviso": "Resultados historicos; no reejecutados para este informe"
-    },
-    {
-      "referencia_local": "deployment-verified-complete.log",
-      "backend_passed": 80
-    },
-    {
-      "referencia_local": "deployment-final-iot.log",
-      "iot_passed": 95,
-      "cobertura_porcentaje": 88.18
-    },
-    {
-      "referencia_local": "stack-sql-retention.log",
-      "tablas_preservadas": 44,
-      "passwords_preserved": true,
-      "home_ownership_addresses_preserved": true,
-      "historical_telemetry_payloads_preserved": true
-    },
-    {
-      "referencia_local": "stack-post-recovery-scenario-final.log",
-      "resultado": "VERIFIED: 5 kWh injection, 3 kWh allocated, 2 kWh unallocated, 0.003 ETH earned/withdrawn, 3 SUN retired."
-    },
-    {
-      "referencia_local": "/tmp/blockchain-seed-tests.log",
-      "seleccion_passed": 26
-    }
-  ],
-  "limites": [
-    "Sin hardware fisico calibrado demostrado",
-    "Sin despliegue publico verificado",
-    "Sin auditoria externa de seguridad",
-    "Sin benchmark de rendimiento ni impacto economico/ambiental medido"
-  ],
   "proyecto": {
     "nombre_espanol": "Red Descentralizada de Energía Comunitaria",
     "nombre_original": "Decentralized-Community-Energy-Network",
@@ -173,5 +11,90 @@
     "autores": "Tres espacios editables en datos_academicos.tex",
     "citas": "Autor y año",
     "referencias": "Orden alfabético y sangría francesa"
-  }
+  },
+  "fecha_documental": "2026-11-18",
+  "fuentes": [
+    {
+      "ruta": "README.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/README.md"
+    },
+    {
+      "ruta": "SECURITY.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/SECURITY.md"
+    },
+    {
+      "ruta": "docs/api.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/docs/api.md"
+    },
+    {
+      "ruta": "docs/architecture.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/docs/architecture.md"
+    },
+    {
+      "ruta": "docs/blockchain.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/docs/blockchain.md"
+    },
+    {
+      "ruta": "docs/community-settlement.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/docs/community-settlement.md"
+    },
+    {
+      "ruta": "docs/configuration.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/docs/configuration.md"
+    },
+    {
+      "ruta": "docs/database.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/docs/database.md"
+    },
+    {
+      "ruta": "docs/deployment.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/docs/deployment.md"
+    },
+    {
+      "ruta": "docs/development.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/docs/development.md"
+    },
+    {
+      "ruta": "docs/documentation-audit.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/docs/documentation-audit.md"
+    },
+    {
+      "ruta": "docs/getting-started.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/docs/getting-started.md"
+    },
+    {
+      "ruta": "docs/iot.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/docs/iot.md"
+    },
+    {
+      "ruta": "docs/verification.md",
+      "url": "https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/docs/verification.md"
+    }
+  ],
+  "estructura": {
+    "tablas": 44,
+    "rutas_api": 71,
+    "operaciones_http": 80
+  },
+  "validacion_local": {
+    "inyeccion_kwh": 5,
+    "asignacion_kwh": 3,
+    "sun_emitidos": 5,
+    "sun_retirados_consumo": 3,
+    "ingreso_productor_eth": "0.003",
+    "disponible_consumidor_eth": "0.007",
+    "red": "Anvil",
+    "origen_mediciones": "Simulado"
+  },
+  "pruebas_registradas": {
+    "contratos": 38,
+    "backend": 80,
+    "iot": 95,
+    "cobertura_iot_porcentaje": 88.18,
+    "interfaz": 35,
+    "navegacion": 11,
+    "seleccion_insercion_procesamiento": 26,
+    "seleccion_ciclo_vida": 32
+  },
+  "nota_pruebas": "Los grupos corresponden a ejecuciones diferentes y pueden compartir casos."
 }

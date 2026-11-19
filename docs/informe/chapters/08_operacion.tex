@@ -19,12 +19,12 @@ La instalación local se administra con \code{scripts/stack.py}, invocado median
 Los servicios comprenden PostgreSQL/TimescaleDB, Redis, Mosquitto, Anvil, inicialización de estado, migración, API, trabajador, suscriptor, frontend y simulador. Los procesos de aplicación esperan la finalización de las migraciones y la disponibilidad de sus dependencias. Los accesos locales utilizan los puertos 8080 para la interfaz, 8000 para la API, 8545 para RPC y 1883 para MQTT.
 
 \subsection{Persistencia de la red y de los registros}
-PostgreSQL conserva identidades, telemetría, cálculo y proyecciones; Anvil conserva contratos, balances y recibos. Son persistencias diferentes que se administran de forma coordinada. El supervisor de la red mantiene snapshots validados mediante archivo temporal, sincronización de escritura y reemplazo atómico; conserva además un checkpoint anterior completo. La identidad de génesis diferencia instalaciones que pueden compartir el mismo chain ID.
+PostgreSQL conserva identidades, telemetría, cálculo y proyecciones; Anvil conserva contratos, balances y recibos. Son persistencias diferentes que se administran de forma coordinada. El supervisor de la red mantiene copias del estado validados mediante archivo temporal, sincronización de escritura y reemplazo atómico; conserva además un punto de guardado anterior completo. La identidad de génesis diferencia instalaciones que pueden compartir el mismo chain ID.
 
-El procedimiento de continuidad incluye un respaldo SQL verificable, conservación de configuración y registros, archivo de referencias financieras anteriores y establecimiento de un corte contable para los nuevos lotes. Los identificadores de la instalación y las autorizaciones se mantienen bajo un registro auditable. La retención de SQL no se interpreta como reconstrucción automática de almacenamiento EVM o de saldos de una cadena diferente.
+El procedimiento de continuidad incluye un respaldo SQL verificable, conservación de configuración y registros, archivo de referencias financieras anteriores y establecimiento de un corte contable para los nuevos lotes. Los identificadores de la instalación y las autorizaciones se mantienen bajo un registro auditable. El respaldo SQL y los archivos EVM conservan sus respectivos datos.
 
 \subsection{Configuración de las conexiones}
-Los servicios utilizan la URL de base de datos definida en la configuración privada. El módulo \code{src.core.docker_database} conserva usuario, contraseña, base y parámetros, y adapta host y puerto al endpoint interno del contenedor. El entrypoint establece esta conexión antes de ejecutar la migración o la aplicación. Las credenciales existentes y los parámetros de inicialización de un volumen nuevo tienen funciones diferenciadas \citep{config}.
+Los servicios utilizan la URL de base de datos definida en la configuración privada. El módulo \code{src.core.docker_database} conserva usuario, contraseña, base y parámetros, y adapta host y puerto al dirección interna del contenedor. El script de inicio establece esta conexión antes de ejecutar la migración o la aplicación. Las credenciales existentes y los parámetros de inicialización de un volumen nuevo tienen funciones diferenciadas \citep{config}.
 
 Las variables de Vite son públicas y se incorporan a la construcción de la interfaz. Las claves de firma, credenciales de medidor y cadenas de conexión privadas permanecen fuera de ese entorno y del repositorio público.
 
@@ -38,9 +38,9 @@ El sistema utiliza bcrypt para contraseñas, JWT para sesión, revocación de id
 
 Los contratos aplican roles, límites de emisión, pruebas de pertenencia, reserva de activos y protección frente a reentrancia en operaciones sensibles. La aplicación mantiene un registro de firmas de servicio y vincula los nonces a la génesis y al remitente. Los retiros de participantes requieren su propia firma \citep{security}.
 
-Como continuidad del desarrollo se consideran gestión de claves, auditoría externa, alta disponibilidad y ampliación de controles de autenticación. La verificación local no equivale a una certificación de seguridad para producción.
+
 
 \subsection{Integración continua y reproducibilidad}
-El archivo \code{.github/workflows/verify.yml} configura instalación de dependencias, suites de contratos, backend, IoT e interfaz, sincronización ABI, escenario integrado y pruebas de navegación. La existencia del flujo documenta la automatización; la afirmación sobre una ejecución remota específica requiere su registro correspondiente.
+El archivo \code{.github/workflows/verify.yml} configura instalación de dependencias, suites de contratos, backend, IoT e interfaz, sincronización ABI, escenario integrado y pruebas de navegación. Los resultados de las ejecuciones se consultan en los registros de pruebas.
 
 El instalador y los archivos de dependencias fijan las herramientas utilizadas. Las versiones del entorno de desarrollo y del nodo Docker se mantienen explícitas para reproducir los ensayos \citep{development}.

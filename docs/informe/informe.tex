@@ -22,13 +22,13 @@
 \usepackage{enumitem,fancyhdr,titlesec,listings,xurl,etoolbox,caption}
 \usepackage[authoryear,round,sort]{natbib}
 \usepackage[unicode,hidelinks]{hyperref}
-\hypersetup{pdftitle={Red Descentralizada de Energía Comunitaria: proceso de desarrollo y resultados alcanzados},pdfsubject={Informe académico en español, formato APA 7, Tecnologías emergentes}}
+\hypersetup{pdftitle={Red Descentralizada de Energía Comunitaria: desarrollo y resultados},pdfsubject={Informe académico en español, formato APA 7, Tecnologías emergentes}}
 \input{datos_academicos}
-\newcommand{\TituloInforme}{Red Descentralizada de Energía Comunitaria: proceso de desarrollo y resultados alcanzados}
-\newcommand{\revision}{acb2d3192b890e331958c9a6abee155a26747b76}
+\newcommand{\NombreProyecto}{Red Descentralizada de Energía Comunitaria}
+\newcommand{\TituloInforme}{\NombreProyecto: desarrollo y resultados}
 \newcommand{\corte}{18 de noviembre de 2026}
 \newcommand{\code}[1]{{\small\nolinkurl{#1}}}
-\newcommand{\repo}[1]{\href{https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/acb2d3192b890e331958c9a6abee155a26747b76/#1}{\nolinkurl{#1}}}
+\newcommand{\repo}[1]{\href{https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/master/#1}{\nolinkurl{#1}}}
 \newcolumntype{L}[1]{>{\RaggedRight\arraybackslash}p{#1}}
 \newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
 \urlstyle{same}
@@ -70,9 +70,12 @@
 \renewcommand{\tablename}{Tabla}
 % Portada academica: numero de pagina; titulo, tres autores y datos del curso.
 \thispagestyle{fancy}
-\vspace*{1.8cm}
+\vspace*{1.3cm}
 \begin{center}
-\textbf{\TituloInforme}\par
+\begin{minipage}{0.9\textwidth}
+\centering
+\textbf{\NombreProyecto:\\Informe de desarrollo y resultados}
+\end{minipage}\par
 \vspace{\baselineskip}
 \AutorUno\\
 \AutorDos\\
@@ -84,7 +87,7 @@
 \end{center}
 \clearpage
 \section*{Resumen}
-\noindent La Red Descentralizada de Energía Comunitaria integra mediciones de hogares, validación de evidencia y liquidación mediante contratos inteligentes. El proyecto está disponible en un repositorio público de GitHub y utiliza una interfaz en React, una API FastAPI con SQLModel, PostgreSQL, mensajería MQTT, procesos de trabajo y cinco contratos EVM. Este informe describe el proceso de desarrollo, la arquitectura, las funcionalidades y los resultados de la validación local. Las mediciones simuladas se procesan en intervalos y se vinculan con lotes aprobados por gobernanza. La emisión de créditos SUN y la liquidación con ETH de prueba se realizan bajo reglas de autorización, custodia y trazabilidad. El escenario financiero conservado registra 5 kWh de inyección elegible, 3 kWh asignados, emisión de 5 SUN, entrega y retiro por consumo de 3 SUN, pago de 0,003 ETH al productor y 0,007 ETH disponibles para el consumidor. La revisión estructural identifica 44 tablas SQLModel, 71 rutas OpenAPI y 80 operaciones HTTP; una selección de 32 pruebas de ciclo de vida se aprobó durante la elaboración. Los resultados permiten caracterizar un prototipo funcional en Anvil. La incorporación de medidores físicos calibrados, la validación pública y la auditoría independiente constituyen líneas de continuidad.
+\noindent La Red Descentralizada de Energía Comunitaria registra mediciones de hogares y gestiona créditos energéticos y pagos entre participantes. El proyecto está disponible en un repositorio público de GitHub. La aplicación utiliza React, FastAPI, SQLModel, PostgreSQL, mensajería MQTT y cinco contratos inteligentes. Este informe describe el proceso de desarrollo, los componentes del sistema, sus funciones y los resultados obtenidos. Los sensores simulados publican lecturas que el servidor valida y agrupa en intervalos. La energía elegible se asigna entre productores y consumidores y se reúne en lotes aprobados por gobernanza. El protocolo emite SUN por la inyección aprobada y liquida las asignaciones mediante depósitos de SUN y ETH de prueba. El escenario registrado incluye 5 kWh de inyección elegible, 3 kWh asignados, emisión de 5 SUN, entrega y retiro por consumo de 3 SUN, cobro de 0,003 ETH por el productor y 0,007 ETH disponibles para el consumidor. La revisión del modelo identificó 44 tablas y la API registró 71 rutas con 80 operaciones HTTP. Las pruebas abarcaron contratos, backend, sensores, publicación e interfaz. Los resultados corresponden a una validación local en Anvil con mediciones simuladas.
 \par\noindent\textit{Palabras clave:} comunidad energética, IoT, blockchain, SUN, gobernanza, liquidación.
 \clearpage
 \begin{center}\textbf{\TituloInforme}\end{center}

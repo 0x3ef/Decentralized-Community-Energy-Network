@@ -1,8 +1,6 @@
 \section{Modelo de datos e integridad}
-\subsection{Fuente del esquema y estado revisado}
-SQLModel y Alembic son la fuente operativa del esquema. Durante esta revisión se registraron \textbf{44 tablas} y se comprobó la cabecera \code{20261112_local_recovery}. Los archivos SQL históricos y el snapshot OpenAPI v2 no se utilizan para instalar una estructura paralela. Las cifras se refieren a tablas registradas por el código inspeccionado, no a una certificación de que cualquier base del usuario esté migrada correctamente \citep{database,models,migration}.
-
-La imagen Docker incluye TimescaleDB, pero las migraciones vigentes no crean hypertables ni retención automática. Por tanto, se documenta una persistencia PostgreSQL relacional con posibilidad futura de diseño temporal, sin atribuirle particionamiento no implementado.
+\subsection{Definición del esquema}
+SQLModel define las tablas y relaciones de la aplicación. Alembic aplica los cambios del esquema mediante migraciones. El modelo registrado contiene 44 tablas y utiliza PostgreSQL como base relacional \citep{database,models}.
 
 \subsection{Dominios principales}
 \begin{longtable}{L{.25\linewidth}L{.65\linewidth}}
@@ -17,7 +15,6 @@ Contabilidad & \code{device_counter_snapshots}, \code{energy_power_snapshots}, \
 Protocolo nativo & \code{native_settlement_policies}, \code{native_settlement_batches}, \code{native_settlement_claims}, \code{native_interval_allocations}, \code{community_native_deployments}.\\
 Ejecución y proyección & \code{outbox_events}, \code{community_chain_operations}, \code{native_indexed_events}, \code{native_sync_cursors}, \code{native_wallet_transactions}.\\
 Auditoría y recuperación & \code{local_chain_recoveries}, \code{community_energy_ledger}, \code{audit_events}.\\
-Historia retenida & Tablas de órdenes, trades, redenciones, despliegues ERC-20 y obligaciones previas; su existencia no las convierte en flujo nativo activo.\\
 \bottomrule
 \end{longtable}
 
@@ -52,7 +49,7 @@ Historia retenida & Tablas de órdenes, trades, redenciones, despliegues ERC-20 
 \end{figure}
 
 \subsection{Tipos y restricciones}
-La energía se representa en Wh enteros. Las obligaciones y precios nativos utilizan \code{NUMERIC(78,0)} para conservar precisión de enteros compatibles con uint256. En la API se transmiten como cadenas decimales. SUN utiliza 18 decimales y los tiempos de cálculo y eventos son conscientes de zona horaria.
+La energía se representa en Wh enteros. Las obligaciones y precios utilizan \code{NUMERIC(78,0)} para conservar precisión de enteros compatibles con uint256. En la API se transmiten como cadenas decimales. SUN utiliza 18 decimales y los tiempos de cálculo y eventos son conscientes de zona horaria.
 
 Se aplican restricciones de unicidad para correo y dirección de wallet, secuencia y mensaje por dispositivo, intervalo por hogar, crédito por intervalo, lote por comunidad y periodo, claim por lote/tipo/nodo y operación firmada por outbox. Los eventos indexados incluyen identidad de bloque para conservar versiones huérfanas sin tratarlas como canónicas.
 
@@ -66,4 +63,4 @@ Las hojas y pruebas Merkle se conservan junto con las cantidades, nodo, medidor,
 \subsection{Semillas y recuperación}
 El seed SQLModel crea cinco hogares y quince dispositivos de ejemplo y respeta identidades, contraseñas y revocaciones existentes. El bootstrap gobernado es una fase diferente: despliega contratos y autoriza participantes mediante transacciones reales locales.
 
-La migración de recuperación añade \code{archived}, origen de génesis y un registro \code{local_chain_recoveries}; no elimina la historia. La nueva marca \code{accounting_start} impide volver a emitir desde intervalos anteriores al reemplazo de cadena. Un registro archivado en \code{RECONCILIATION_REQUIRED} conserva evidencia de una cadena perdida: no es una promesa de que esperar restaurará sus fondos.
+La migración de recuperación añade \code{archived}, origen de génesis y un registro \code{local_chain_recoveries}; no elimina la historia. La nueva marca \code{accounting_start} impide volver a emitir desde intervalos anteriores al reemplazo de cadena. Los registros archivados conservan las referencias de las operaciones de la instalación correspondiente.

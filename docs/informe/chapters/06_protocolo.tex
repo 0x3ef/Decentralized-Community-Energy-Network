@@ -4,41 +4,41 @@
 \caption{Responsabilidades de los cinco contratos activos.}\label{tab:contratos}\\
 \toprule Contrato & Responsabilidad \\ \midrule\endfirsthead
 \toprule Contrato & Responsabilidad \\ \midrule\endhead
-\code{TimelockController} & Programación y ejecución con retraso y roles de gobernanza. No es el vault de pagos energéticos.\\
+\code{TimelockController} & Programación y ejecución con retraso y roles de gobernanza.\\
 \code{CommunityRegistry} & Ciclo de vida, membresías, nodos, medidores, precio y vínculos con los contratos comunitarios.\\
 \code{SUNToken} & ERC-20 con emisión restringida, 18 decimales, pausado, quema y anclajes contables.\\
 \code{CommunitySettlement} & Lotes, revisión, finalización, prueba de inyección, emisión acotada y retiro por consumo.\\
 \code{NativeSettlementVault} & Depósitos de ETH y SUN, reservas, entrega atómica y retiros por el propietario.\\
 \bottomrule
 \end{longtable}
-Los contratos utilizan Solidity 0.8.24 y componentes OpenZeppelin. Los ABI nativos compartidos entre backend y frontend se sincronizan mediante un script específico. La administración inicial reside en un contrato timelock, no en una cuenta externa con un privilegio de bootstrap permanente. El minter de SUN se concede a CommunitySettlement y se revoca al otorgante inicial una vez comisionado el protocolo \citep{blockchain,contracts}.
+Los contratos utilizan Solidity 0.8.24 y componentes OpenZeppelin. Los ABI nativos compartidos entre backend y frontend se sincronizan mediante un script específico. La administración se asigna al contrato timelock. El minter de SUN se concede a CommunitySettlement y se revoca al otorgante inicial una vez autorizado el protocolo \citep{blockchain,contracts}.
 
 \subsection{Ciclo de vida y gobernanza}
 La comunidad pasa por propuesta, revisión, aprobación y activación, con transiciones autorizadas para rechazo, suspensión o archivo. La membresía también tiene estados y no se obtiene por conectar una wallet. El operador comunitario y los roles de registrador de medidores, oráculo, liquidación y pausa son permisos diferentes.
 
-Una acción del timelock se \textbf{programa} y después se \textbf{ejecuta} al cumplirse el retraso. El entorno de validación utiliza demora cero; el tooling público exige al menos 24 horas. Esto es distinto del periodo de impugnación del lote. Cero demora local no elimina las dos transacciones ni convierte la gobernanza en automática.
+Una acción del timelock se \textbf{programa} y después se \textbf{ejecuta} al cumplirse el retraso. El entorno local utiliza demora cero y conserva las dos transacciones de programación y ejecución. El lote también tiene un periodo de revisión antes de su finalización.
 
-El precio positivo en wei/kWh se configura mientras la comunidad está aprobada y se fija al activarla. Cambiarlo después requiere una política o despliegue revisado compatible; no se reescriben obligaciones anteriores. La gobernanza revisa evidencia, pero no implementa una prueba automática universal contra el fraude físico.
+El precio por kWh se establece mientras la comunidad está aprobada y queda fijado al activarla. Ese precio se incorpora a las asignaciones del lote.
 
 \subsection{Asignación de cantidades}
 Sea $S$ la inyección neta elegible total y $D$ la demanda neta elegible. La cantidad asignable cumple:
 \begin{equation}
 A=\min(S,D),\quad 0\leq A\leq S,\quad A\leq D.
 \end{equation}
-La política compensa importación y exportación del intervalo y la autooferta de varios nodos de una misma wallet. Una reducción por pérdidas configurable afecta la oferta elegible; no constituye una simulación topológica de red.
+La política compensa importación y exportación del intervalo y la autooferta de varios nodos de una misma wallet. La política permite aplicar un factor de pérdidas a la oferta elegible.
 
 Para repartir $A$ entre demandas $d_j$, la base entera es:
 \begin{equation}
 a_j^{(0)}=\left\lfloor\frac{A d_j}{\sum_k d_k}\right\rfloor.
 \end{equation}
-Las unidades restantes se distribuyen por mayores residuos y desempate estable de identidad. Se realiza un reparto análogo de oferta y un emparejamiento determinista productor-consumidor. No se permite que una wallet se pague a sí misma. El uso de Wh enteros evita residuales energéticos de punto flotante \citep{allocation,settlement}.
+Las unidades restantes se distribuyen por mayores residuos y desempate estable de identidad. Se realiza un reparto análogo de oferta y un emparejamiento determinista productor-consumidor. El reparto se realiza entre participantes distintos. El uso de Wh enteros evita residuales energéticos de punto flotante \citep{allocation,settlement}.
 
 \subsection{Lotes y compromisos de evidencia}
 El oráculo presenta intervalo, política, raíz Merkle, totales y asignación en un lote. El estado inicial en cadena es \code{CHALLENGEABLE}. Después de la revisión, la gobernanza puede finalizarlo o rechazarlo. Solo un lote canónico puede quedar finalizado por comunidad e intervalo bajo las reglas actuales.
 
-Una prueba Merkle demuestra pertenencia a la raíz comprometida. Las hojas incluyen clase de operación, lote, claim o asignación, nodos, medidores, beneficiarios y cantidades. La doble aplicación de keccak y el orden de pares coinciden entre ABI, backend y contratos. La raíz no cifra la telemetría ni prueba su veracidad física; evita sustituir sus compromisos sin cambiar el resumen aprobado.
+Una prueba Merkle demuestra pertenencia a la raíz comprometida. Las hojas incluyen clase de operación, lote, claim o asignación, nodos, medidores, beneficiarios y cantidades. La doble aplicación de keccak y el orden de pares coinciden entre ABI, backend y contratos. La raíz permite comprobar que una prueba corresponde al conjunto aprobado.
 
-La sustitución de un lote finalizado exige que no se hayan emitido o retirado créditos ni utilizado las asignaciones en las condiciones que lo impiden. No existe reversión automática de pagos ya ejecutados.
+El contrato permite sustituir un lote finalizado que conserve las condiciones de uso requeridas.
 
 \subsection{Emisión, unidades y precio}
 La equivalencia contable es:
@@ -46,9 +46,9 @@ La equivalencia contable es:
 1\;\text{SUN}=1\;\text{kWh},\qquad
 1\;\text{Wh}=10^{15}\;\text{unidades base SUN}.
 \end{equation}
-Un lote finalizado habilita las reclamaciones de emisión. El worker tramita su transacción; \code{FINALIZED} no implica mint instantáneo. La emisión agregada no puede exceder la inyección aprobada y cada claim es único. Los depósitos económicos no son un requisito de emisión.
+La finalización del lote habilita la emisión. El trabajador tramita la transacción y consulta su confirmación. La emisión agregada no puede exceder la inyección aprobada y cada claim es único. La emisión precede a la financiación y liquidación de las asignaciones.
 
-El precio $p$ es una política comunitaria, no un tipo de cambio de mercado. Para una asignación de $w$ Wh, el coste en wei es:
+El precio $p$ procede de la política comunitaria. Para una asignación de $w$ Wh, el coste en wei es:
 \begin{equation}
 c=\left\lceil\frac{w\,p}{1000}\right\rceil.
 \label{eq:coste}
@@ -56,9 +56,9 @@ c=\left\lceil\frac{w\,p}{1000}\right\rceil.
 En el ejemplo, $p=10^{15}$ wei/kWh, equivalente a 0,001 ETH/kWh. Así, 108 Wh corresponden a 0,108 SUN y 0,000108 ETH. Fraccionar cantidades en varias parejas puede añadir hasta un wei de redondeo por pareja frente a una única cuenta conjunta; el mismo importe se acredita y se adeuda, sin residuo monetario sin propietario.
 
 \subsection{Depósitos, reserva y entrega}
-El productor primero autoriza gasto ERC-20 al vault y después deposita SUN. El consumidor deposita ETH nativo y establece un límite de precio. El backend no puede extraer ETH directamente de una wallet. Una reserva exige prueba de asignación, cantidad, precio, ETH y SUN suficientes; si falta algún respaldo, la transacción revierte completa.
+El productor primero autoriza gasto ERC-20 al vault y después deposita SUN. El consumidor deposita ETH nativo y establece un límite de precio. El participante firma el aporte de ETH desde su wallet. Una reserva exige prueba de asignación, cantidad, precio, ETH y SUN suficientes; si falta algún respaldo, la transacción revierte completa.
 
-La ejecución de una reserva válida entrega SUN al consumidor y acredita ingresos retirables del productor en la misma transacción. El usuario no recibe dos pagos por consumir y quemar: el ingreso surge aquí y se cobra después mediante \code{withdrawEarnings}. Las reservas cancelables liberan activos; no deshacen liquidaciones ya realizadas.
+La ejecución de una reserva válida entrega SUN al consumidor y acredita ingresos retirables del productor en la misma transacción. El ingreso se acredita durante la liquidación y se cobra con \code{withdrawEarnings}. La cancelación de una reserva libera los activos correspondientes.
 
 \begin{figure}[htbp]
 \caption{Flujo de activos durante la liquidación}\label{fig:activos}
@@ -82,7 +82,7 @@ La ejecución de una reserva válida entrega SUN al consumidor y acredita ingres
 \end{figure}
 
 \subsection{Retiro por consumo e invariantes}
-El consumidor aprueba un allowance diferente, dirigido a CommunitySettlement, y presenta una prueba de consumo. El retiro exige lote finalizado, participante/nodo/medidor autorizados y entrega financiera completa de la asignación comprometida para ese nodo. Se queman los SUN y se marca el consumo como utilizado. Poseer SUN transferidos por otra vía no crea por sí mismo una elegibilidad.
+El consumidor aprueba un allowance diferente, dirigido a CommunitySettlement, y presenta una prueba de consumo. El retiro exige lote finalizado, participante/nodo/medidor autorizados y entrega financiera completa de la asignación comprometida para ese nodo. Se queman los SUN y se marca el consumo como utilizado. La prueba vincula los SUN utilizados con el consumo entregado.
 
 Los invariantes principales de respaldo son:
 \begin{align}

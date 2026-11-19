@@ -1,5 +1,5 @@
 \apendice{Funciones principales de los contratos}
-Este anexo describe las funciones de negocio y grupos heredados relevantes. Los getters generados por mappings y variables públicas, constructores y detalles internos se consultan en el código Solidity y ABI de la revisión fijada. No se presenta esta síntesis como reemplazo de una especificación formal del contrato.
+Este anexo resume las funciones de los contratos utilizados. Las consultas públicas permiten revisar saldos, roles y estados del protocolo.
 
 \subsection{TimelockController}
 \begin{longtable}{L{.37\linewidth}L{.53\linewidth}}
@@ -65,83 +65,8 @@ Validaciones internas & \code{_check} y \code{_financiallyUsed} comprueban autor
 \bottomrule
 \end{longtable}
 
-\apendice{Consultas de seguimiento y verificación}
-Las consultas siguientes corresponden al esquema inspeccionado y no alteran registros. Deben ejecutarse contra la base correcta, sin imprimir cadenas de conexión ni secretos.
+\apendice{Glosario}
 
-\subsection{Recepción y calidad}
-\begin{lstlisting}[language=SQL]
-SELECT now() AS hora_bd,
-       max(measured_at) AS ultima_medicion,
-       max(received_at) AS ultima_recepcion,
-       count(*) FILTER (
-         WHERE received_at > now() - interval '5 minutes'
-       ) AS recibidos_5_min
-FROM telemetry_messages;
-
-SELECT d.device_code, t.quality_status,
-       count(*) AS mensajes, max(t.measured_at) AS ultima
-FROM telemetry_messages t
-JOIN devices d ON d.id = t.device_id
-WHERE t.received_at > now() - interval '10 minutes'
-GROUP BY d.device_code, t.quality_status
-ORDER BY d.device_code, t.quality_status;
-\end{lstlisting}
-
-\subsection{Intervalos elegibles posteriores a recuperación}
-\begin{lstlisting}[language=SQL]
-SELECT e.id, e.interval_start, e.eligible_export_wh
-FROM energy_intervals e
-JOIN community_nodes n ON n.home_id = e.home_id
-JOIN community_native_deployments d
-  ON d.community_id = n.community_id
-WHERE e.quality_status = 'FINALIZED'
-  AND e.eligible_export_wh > 0
-  AND (d.accounting_start IS NULL
-       OR e.interval_start >= d.accounting_start)
-ORDER BY e.interval_start DESC;
-\end{lstlisting}
-Este resultado identifica candidatos de evidencia; aún deben pasar política, lote y finalización. No es una consulta de tokens ya emitidos.
-
-\subsection{Estado de lotes, claims y asignaciones}
-\begin{lstlisting}[language=SQL]
-SELECT id, interval_start, status, archived
-FROM native_settlement_batches
-ORDER BY interval_start DESC LIMIT 20;
-
-SELECT b.id AS lote, b.status AS estado_lote, b.archived,
-       c.kind, c.energy_wh, c.status AS estado_claim
-FROM native_settlement_claims c
-JOIN native_settlement_batches b ON b.id = c.batch_id
-ORDER BY b.interval_start DESC LIMIT 30;
-
-SELECT a.id, a.energy_wh, a.due_wei,
-       a.status, a.funding_status, b.archived
-FROM native_interval_allocations a
-JOIN native_settlement_batches b ON b.id = a.batch_id
-ORDER BY b.interval_start DESC LIMIT 30;
-\end{lstlisting}
-\code{kind=0} corresponde a emisión y \code{kind=1} a retiro por consumo. Los datos SQL son proyecciones y se contrastan con recibos/eventos del despliegue activo antes de afirmar éxito económico.
-
-\apendice{Reproducción del informe y fuentes de evidencia}
-\subsection{Compilación}
-El proyecto LaTeX usa XeLaTeX, latexmk, Polyglossia, TikZ, fontspec, natbib, booktabs, longtable, caption y listings. No necesita shell-escape, descarga de imágenes ni una base de datos. El cuerpo se configura a 12 puntos con Times New Roman cuando está disponible o Nimbus Roman, una tipografía compatible con Times, como alternativa. Se utilizan márgenes de 2,54 cm, interlineado doble, sangría inicial de 1,27 cm y citas de autor y año. Las tablas utilizan interlineado sencillo para favorecer su lectura.
-\begin{lstlisting}[language=bash]
-cd docs/informe
-make pdf
-# Resultado: build/informe.pdf
-\end{lstlisting}
-Como alternativa, importar la carpeta completa a Overleaf, seleccionar XeLaTeX y definir \code{informe.tex} como documento principal. La portada se personaliza en \code{datos_academicos.tex}: incluye tres autores, institución, la asignatura Tecnologías emergentes, docente y fecha. La fecha y revisión del informe son explícitas; no cambian al recompilar. El PDF es un resultado generado y los archivos auxiliares se excluyen de Git.
-
-\subsection{Qué se conserva en el paquete}
-\begin{itemize}
-\item Fuentes LaTeX, apartados, referencias y Makefile de compilación.
-\item Manifiesto de revisión, tablas, cabecera Alembic, OpenAPI y campañas de prueba, sin secretos.
-\item Copia del escenario local público versionado, con procedencia y hash del archivo original.
-\item Resumen de la suite seleccionada ejecutada para la revisión documental.
-\end{itemize}
-El manifiesto \code{evidencia/manifest.json} distingue evidencia versionada de registros locales de trabajo que no forman parte del repositorio general. Los resúmenes de campañas anteriores no convierten esos logs en un conjunto público completo.
-
-\subsection{Glosario}
 \begin{longtable}{L{.24\linewidth}L{.66\linewidth}}
 \toprule Término & Significado en este proyecto \\ \midrule\endfirsthead
 \toprule Término & Significado en este proyecto \\ \midrule\endhead

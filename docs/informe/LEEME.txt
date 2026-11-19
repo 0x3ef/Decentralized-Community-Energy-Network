@@ -30,5 +30,5 @@ No se requieren shell-escape, conexion a una base de datos ni claves.
 
 Contenido
 Fuentes, capitulos, referencias, datos editables de portada y evidencia publica.
-El informe describe el proceso, arquitectura, funcionalidades y resultados.
+El informe describe el proceso, la arquitectura, las funciones y los resultados.
 Las guias operativas del repositorio mantienen su funcion de referencia.

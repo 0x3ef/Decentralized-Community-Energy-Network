@@ -1,5 +1,4 @@
 Resumen de la verificación documental conservada
-Revisión del código: acb2d31
 Suite: apps/backend/tests/test_stack_lifecycle.py
 Resultado: 32 pruebas aprobadas
 Alcance: ciclo de vida, configuración, preservación y transporte de escenario.

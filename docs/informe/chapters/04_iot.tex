@@ -1,33 +1,33 @@
 \section{Infraestructura IoT y contabilidad energética}
 \subsection{Modelo del hogar simulado}
-La simulación utiliza un estado coordinado por hogar en \code{iot/simulator/physics.py}. Los sensores no inventan curvas independientes que puedan contradecirse: generación, carga, almacenamiento e intercambio se derivan de una misma evolución física sintética. Existen perfiles de consumidor, productor solar, prosumidor, prosumidor con batería y pequeña instalación comercial. Las capacidades instaladas determinan qué canales se publican \citep{iot}.
+La simulación utiliza un estado coordinado por hogar en \code{iot/simulator/physics.py}. La generación, el consumo, el almacenamiento y el intercambio de los sensores se calculan a partir del mismo estado del hogar. Existen perfiles de consumidor, productor solar, prosumidor, prosumidor con batería y pequeña instalación comercial. Las capacidades instaladas determinan qué canales se publican \citep{iot}.
 
 El balance de potencia del bus de corriente alterna se expresa como:
 \begin{equation}
 P_{PV}+P_{\text{descarga}}+P_{\text{importación}}=P_{\text{carga}}+P_{\text{batería}}+P_{\text{exportación}}.
 \label{eq:balance}
 \end{equation}
-Las eficiencias de conversión fotovoltaica y almacenamiento se modelan por separado. La batería respeta límites de estado de carga. La integración utiliza tiempo UTC transcurrido y subpasos físicos acotados; no se confunden segundos de espera del programa con tiempo simulado.
+Las eficiencias de conversión fotovoltaica y almacenamiento se modelan por separado. La batería respeta límites de estado de carga. El simulador calcula la energía con el tiempo UTC transcurrido y divide los periodos largos en pasos de cálculo.
 
-La elevación solar depende de fecha y ubicación de Cali; las nubes y las cargas varían gradualmente. Noches sin exportación pueden ser un comportamiento esperado. Estos perfiles permiten pruebas reproducibles, pero no constituyen predicciones meteorológicas ni datos calibrados de una instalación.
+La elevación solar depende de fecha y ubicación de Cali; las nubes y las cargas varían gradualmente. La producción sigue la disponibilidad solar del perfil. Los datos se identifican como simulados.
 
 \begin{longtable}{L{.22\linewidth}L{.35\linewidth}L{.32\linewidth}}
 \caption{Sensores y utilidad de sus datos.}\label{tab:sensores}\\
 \toprule Sensor & Datos principales & Uso en la plataforma \\ \midrule\endfirsthead
 \toprule Sensor & Datos principales & Uso en la plataforma \\ \midrule\endhead
 Medidor inteligente & Contadores de consumo e importación/exportación; potencia, corriente, voltaje y frecuencia. & Fuente principal de intercambio de red y de evidencia para intervalos.\\
-Inversor solar & Potencia y energía fotovoltaica, condiciones y temperatura del inversor. & Seguimiento de generación y coherencia con la operación del hogar; no sustituye al medidor de exportación.\\
+Inversor solar & Potencia y energía fotovoltaica, condiciones y temperatura del inversor. & Consulta de generación y comparación con el intercambio del hogar.\\
 Monitor de batería & Estado de carga, capacidad, carga/descarga y contadores. & Seguimiento del almacenamiento y balance energético.\\
 Estación meteorológica & Irradiancia y temperaturas del entorno y panel. & Contexto de producción solar y diagnóstico de la simulación.\\
 \bottomrule
 \end{longtable}
 
 \subsection{Modos de simulación y procedencia}
-El modo normal es \code{REALTIME}, velocidad uno y fallos desactivados. La publicación registrada se realiza mediante MQTT v2. Los modos deterministas o acelerados permiten auditoría y pruebas acotadas, pero no aportan evidencia de liquidación del flujo normal. El gateway gRPC v1 permanece como ruta diagnóstica, no como transporte principal del simulador gobernado.
+El modo utilizado en el recorrido operativo es \code{REALTIME}. Los dispositivos publican mensajes MQTT v2 identificados como simulados. Los modos de ensayo permiten comprobar la evolución de los contadores y la consistencia del modelo.
 
-El protocolo de mensajes declara \code{source=SIMULATED}; la fuente autorizada del dispositivo en el servidor prevalece sobre lo que afirme el publicador. Cambiar una etiqueta del JSON no convierte una medición virtual en física. Los modos de ensayo permiten evaluar continuidad de publicación, consistencia temporal, identidad de las fuentes y comportamiento de los contadores bajo condiciones controladas.
+Cada mensaje declara \code{source=SIMULATED}. El servidor contrasta esa fuente con el registro autorizado del dispositivo.
 
-\subsection{Sobre de telemetría y autenticación}
+\subsection{Mensaje de telemetría y autenticación}
 El tópico canónico es \code{solar/<community>/<node>/<device>/telemetry}. El sobre v2 incluye versión, identificador de mensaje, secuencia, hora de medición, hogar, dispositivo público, comunidad, nodo, fuente, modo, unidades y datos. La credencial se verifica, pero se excluye del payload persistido y de los digests de auditoría.
 
 La aceptación exige correspondencia entre tópico, identidades, dispositivo activo, autorización de medidor y membresía. Se rechazan campos desconocidos, unidades incorrectas, valores no finitos, rangos no plausibles y horas fuera de la ventana admitida. El UUID público usado en el transporte difiere del identificador interno de la fila de dispositivo.
@@ -41,14 +41,14 @@ La primera observación establece una línea base. Un mensaje repetido no genera
 
 Los intervalos habituales son de 900 segundos, alineados en UTC. La cadencia normal es de 15 segundos y el cierre espera dos minutos de gracia. La elegibilidad requiere observaciones procesadas en los dos límites exactos, además de autorización vigente y ausencia de evidencia inválida. El planificador incluye límites contables aun cuando la cadencia configurada no los divide; los cortes perdidos no se rellenan retroactivamente.
 
-Una muestra inicial parcial o un periodo posterior a una desconexión puede resultar incompleto o rechazado. Esta es una exclusión contable, no una instrucción para cambiar manualmente el estado a finalizado.
+Una muestra inicial parcial o un periodo posterior a una desconexión puede resultar incompleto o rechazado. El estado queda registrado para su consulta.
 
 \subsection{Calidad y trazabilidad}
 \begin{longtable}{L{.26\linewidth}L{.64\linewidth}}
 \caption{Interpretación de estados energéticos y de telemetría.}\\
 \toprule Estado & Significado operativo \\ \midrule\endfirsthead
 \toprule Estado & Significado operativo \\ \midrule\endhead
-\code{valid} & Sobre aceptado y pendiente de procesamiento energético.\\
+\code{valid} & Mensaje aceptado y pendiente de procesamiento energético.\\
 \code{PROCESSED} & Mensaje procesado; no prueba por sí solo que todo el intervalo sea elegible.\\
 \code{COUNTER_GAP}, \code{COUNTER_RESET} & Se requiere una nueva base; no se acredita como energía el salto problemático.\\
 \code{OPEN} & Intervalo aún en cálculo o pendiente de cierre y evidencia.\\
@@ -57,4 +57,4 @@ Una muestra inicial parcial o un periodo posterior a una desconexión puede resu
 \code{FINALIZED} en intervalo & El cálculo energético terminó; no equivale a lote aprobado ni token emitido.\\
 \bottomrule
 \end{longtable}
-Las evaluaciones de calidad conservan motivo, digest y ocurrencias. Un mensaje inválido no debe refrescar la señal de última telemetría autenticada. En redes no confiables se dispone de provisión de ACL por tópico y overlay TLS; la configuración local anónima no se considera segura para exposición pública.
+Las evaluaciones de calidad conservan el motivo y el número de ocurrencias. La fecha de actividad del dispositivo se actualiza con telemetría autenticada. El proyecto incluye configuración de permisos por tópico y transporte TLS para MQTT.

@@ -1,36 +1,33 @@
-\section{Proceso de desarrollo y decisiones técnicas}
-\subsection{Estrategia de implementación}
-El historial del repositorio documenta una construcción incremental: base de contabilidad y operación, integración IoT y persistencia, protocolo gobernado con ETH nativo, interfaz y validación conjunta. La secuencia describe entregables observables del código. No se atribuye una metodología formal de gestión, duración de sprints o tamaño de equipo que no esté documentado \citep{history}.
+\section{Proceso de desarrollo}
+\subsection{Organización del trabajo}
+El desarrollo se dividió por funciones. Se definieron las entidades de la comunidad, se conectó la recepción de mediciones con la base de datos, se implementaron los cálculos energéticos y se integraron los contratos con la interfaz \citep{development,architecture}.
 
-\begin{longtable}{L{.21\linewidth}L{.23\linewidth}L{.45\linewidth}}
-\caption{Etapas del desarrollo del proyecto}\label{tab:hitos}\\
-\toprule Etapa & Revisiones & Entregable técnico \\ \midrule\endfirsthead
-\toprule Etapa & Revisiones & Entregable técnico \\ \midrule\endhead
-Base funcional & \code{5c1e686}, \code{9ff670f} & Contabilidad comunitaria inicial y espacio de trabajo conectado con la API.\\
-Integración IoT y modelos & \code{a3add96}, \code{7b4f894}, \code{ba3ea71} & Física coordinada por hogar, publicación persistente y provisión mediante SQLModel.\\
-Protocolo gobernado & \code{71882e7}, \code{ea79b35} & Registro de comunidades, roles separados y acciones de wallet preparadas sin firma por el servidor.\\
-Automatización & \code{7c87a83}, \code{9b95d24} & Cálculo de intervalos, operaciones durables, conciliación y procedencia de telemetría v2.\\
-Interfaz e integración & \code{99fd0ef}, \code{e061ab0} & Interfaz en español y validación integrada del ciclo energético y financiero local.\\
-Documentación & \code{aa44223} & Consolidación de guías y definición del protocolo activo y su alcance.\\
-Coordinación temporal & \code{0fdf5c8}, \code{62b5c7e} & Muestreo alineado con UTC y preparación de la finalización de lotes desde la interfaz.\\
-Operación persistente & \code{2ef7536} & Ciclo Docker unificado, checkpoints atómicos y continuidad sobre la misma base SQL.\\
-Validación desde SQL & \code{46d5da8} & Inserción autenticada de lecturas y verificación del recorrido ETH/SUN.\\
-Configuración del despliegue & \code{acb2d31} & Conservación de las credenciales de conexión y adaptación del endpoint de base de datos para contenedores.\\
+\begin{longtable}{L{.23\linewidth}L{.34\linewidth}L{.33\linewidth}}
+\caption{Etapas de desarrollo y productos obtenidos}\label{tab:etapas}\\
+\toprule Etapa & Trabajo realizado & Producto obtenido \\ \midrule\endfirsthead
+\toprule Etapa & Trabajo realizado & Producto obtenido \\ \midrule\endhead
+Modelo del sistema & Definición de usuarios, hogares, comunidades, dispositivos y energía. & Modelos SQLModel y relaciones entre entidades.\\
+Captura IoT & Simulación de hogares, generación de mensajes y conexión MQTT. & Lecturas identificadas por dispositivo y almacenadas por el suscriptor.\\
+Contabilidad & Cálculo por contadores, intervalos y reglas de asignación. & Energía elegible y cantidades asignadas a participantes.\\
+Contratos & Registro comunitario, gobernanza, SUN y custodia de activos. & Emisión, reservas, liquidación y retiros en la red local.\\
+Aplicación web & Pantallas, consultas y preparación de operaciones de wallet. & Interfaz en español para productores, consumidores y administrador.\\
+Despliegue & Integración de servicios, migraciones y almacenamiento persistente. & Entorno local administrado con Docker Compose.\\
+Pruebas & Verificación de componentes y del recorrido energético y financiero. & Resultados registrados del escenario local y las suites automatizadas.\\
 \bottomrule
 \end{longtable}
-Los hitos corresponden a registros de Git de noviembre de 2026. Las fechas de autoría, integración y ejecución tienen significados diferentes; la secuencia se utiliza como trazabilidad de entregables y no como estimación del esfuerzo realizado.
 
-\subsection{Diseño del dominio}
-El desarrollo estableció entidades separadas para usuario, wallet, hogar, comunidad, nodo y medidor. Esta decisión permite que la propiedad del hogar, el control de una dirección blockchain y la autoridad de gobernanza se comprueben en sus respectivos ámbitos. Los intervalos, créditos, lotes y asignaciones completan el modelo contable y financiero.
+\subsection{Modelado y persistencia}
+Se separaron usuario, wallet, hogar, nodo y medidor para comprobar la propiedad de cada recurso. Los intervalos describen cantidades de energía; los créditos representan el derecho de emisión; los lotes agrupan la información que se aprueba; y las asignaciones relacionan productor y consumidor.
 
-\subsection{Persistencia y provisión}
-Los modelos SQLModel y las migraciones Alembic constituyen una fuente única del esquema. Las semillas construyen identidades y dispositivos conforme a esos modelos; la provisión gobernada añade contratos y autorizaciones mediante transacciones locales. La generación de información inicial se diferencia de la emisión de créditos y del reconocimiento de pagos \citep{models,migration}.
+SQLModel define las tablas y Alembic aplica sus migraciones. La provisión crea los hogares y dispositivos de prueba y establece sus autorizaciones. Los datos iniciales y las operaciones económicas se gestionan en etapas distintas \citep{models,database}.
 
-\subsection{Trazabilidad de la evidencia}
-El diseño vincula la telemetría validada con los intervalos y la política comunitaria. Los lotes comprometen cantidades, participantes y pruebas antes de la emisión. Las reclamaciones únicas limitan la utilización de cada derecho y permiten seguir el origen del crédito.
+\subsection{Integración de la energía y los contratos}
+Se vinculó cada lectura con un dispositivo y cada dispositivo con un hogar y un nodo. A partir de los contadores se calculan los intervalos. El servidor aplica la política de la comunidad, reúne las asignaciones y prepara el lote para su presentación en blockchain.
 
-\subsection{Custodia y liquidación}
-El protocolo nativo reserva SUN del productor y ETH del consumidor antes de ejecutar una asignación. El resultado económico se obtiene del contrato y se refleja en la aplicación mediante recibos y eventos confirmados. De esta forma se mantiene correspondencia entre los registros del servidor y los activos custodiados.
+Los contratos comprueban las autorizaciones y las pruebas del lote. La gobernanza lo finaliza; después se tramitan las emisiones y las liquidaciones que cumplen las condiciones de financiación \citep{settlement,contracts}.
 
-\subsection{Integración y validación}
-La integración conectó publicación MQTT, recepción, procesamiento energético, gobernanza, emisión y liquidación. Los ensayos automatizados verifican tanto componentes individuales como el escenario financiero completo. La documentación y los manifiestos conservan el alcance de cada campaña para distinguir implementación, ejecución comprobada y trabajo posterior \citep{verification,scenario}.
+\subsection{Integración de la interfaz}
+La interfaz consulta la API y presenta energía, créditos, asignaciones y saldos. Las operaciones económicas incluyen una pantalla de revisión antes de solicitar la firma en MetaMask. El usuario puede seguir el resultado en el registro de transacciones.
+
+\subsection{Verificación}
+Las pruebas abarcan reglas de los contratos, servicios del backend, sensores, publicación MQTT e interfaz. El escenario financiero comprueba el recorrido desde las lecturas hasta la entrega de SUN, el pago al productor y el retiro por consumo \citep{verification,scenario}.
