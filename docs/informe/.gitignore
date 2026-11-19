@@ -9,3 +9,6 @@ build/
 *.fdb_latexmk
 *.xdv
 *.synctex.gz
+/informe.pdf
+*.dvi
+*.ps

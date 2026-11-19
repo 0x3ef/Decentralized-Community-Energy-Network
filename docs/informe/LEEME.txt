@@ -1,34 +1,51 @@
 RED DESCENTRALIZADA DE ENERGIA COMUNITARIA — INFORME APA 7
 
-Proyecto original: Decentralized-Community-Energy-Network
+Proyecto: Decentralized-Community-Energy-Network
 Repositorio publico:
 https://github.com/0x3ef/Decentralized-Community-Energy-Network
 
-Portada
-Editar datos_academicos.tex. Hay tres espacios para los integrantes.
-La asignatura ya esta definida como Tecnologias emergentes.
-Completar la institucion, el docente y la fecha que corresponda.
+PORTADA
+Editar datos_academicos.tex: tres integrantes, institucion, docente y fecha.
+La asignatura es Tecnologias emergentes.
 
-Formato academico
-Tamano carta; margenes de 2,54 cm; fuente Times New Roman, o Nimbus Roman
-compatible con Times si no esta instalada; cuerpo de 12 puntos; interlineado
-doble; sangria de 1,27 cm; alineacion izquierda; numero superior derecho.
-Encabezados sin numeracion. Resumen en un parrafo y palabras clave.
-Citas de autor y ano; referencias alfabeticas con sangria francesa.
-Numero y titulo de tablas/figuras encima del elemento. Las tablas y los
-bloques de codigo usan espaciado adaptado para conservar legibilidad.
-No se incluyen indice general, listas de tablas ni cabeceras comerciales.
+TEXMAKER CON EL COMANDO LATEX
+1. Abrir informe.tex. Conservar chapters/, referencias.tex y
+   datos_academicos.tex junto al archivo principal.
+2. En Opciones > Configurar Texmaker > Comandos, establecer PdfLaTeX como:
+   latex -interaction=nonstopmode -synctex=1 %.tex
+3. En Compilacion rapida, seleccionar PdfLaTeX + Ver PDF.
+4. Ejecutar la compilacion rapida tres veces la primera vez.
+5. Abrir informe.pdf. No se necesita la secuencia DVI/PS.
 
-Compilar desde esta carpeta:
+Aunque el boton se llame PdfLaTeX, el comando configurado utiliza latex.
+La plantilla activa la salida PDF cuando latex usa el motor pdfTeX de TeX Live.
+Si esta instalado pdflatex, tambien puede usarse directamente.
+
+TERMINAL SIN LATEXMK NI XELATEX
+Desde esta carpeta:
+    mkdir -p build
+    latex -interaction=nonstopmode -halt-on-error -output-directory=build informe.tex
+Ejecutar el ultimo comando tres veces en total para completar las referencias.
+Resultado: build/informe.pdf
+
+CON MAKE
     make pdf
-Resultado:
-    build/informe.pdf
+Make utiliza pdflatex si existe y, en otro caso, latex.
+Para elegirlo explicitamente:
+    make COMPILADOR=latex pdf
 
-Overleaf
-Importar el ZIP, seleccionar informe.tex y usar el compilador XeLaTeX.
-No se requieren shell-escape, conexion a una base de datos ni claves.
+OVERLEAF
+Importar el ZIP, seleccionar informe.tex y usar pdfLaTeX.
+La plantilla tambien conserva compatibilidad con XeLaTeX.
 
-Contenido
-Fuentes, capitulos, referencias, datos editables de portada y evidencia publica.
-El informe describe el proceso, la arquitectura, las funciones y los resultados.
-Las guias operativas del repositorio mantienen su funcion de referencia.
+PAQUETES
+La distribucion TeX debe incluir los paquetes de tablas, TikZ, natbib y fuentes
+Times de LaTeX. La compilacion PDF con latex o pdflatex no carga fontspec ni
+polyglossia y no requiere fuentes instaladas en el sistema operativo.
+En Gentoo, un paquete ausente se identifica en el primer mensaje
+"LaTeX Error: File ... not found".
+
+FORMATO
+Carta; margenes de 2,54 cm; cuerpo de 12 puntos; fuente compatible con Times;
+interlineado doble; sangria de 1,27 cm; numeracion superior derecha.
+Citas de autor y ano y referencias con sangria francesa.
