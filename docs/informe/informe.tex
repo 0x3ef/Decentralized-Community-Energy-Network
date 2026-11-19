@@ -1,5 +1,5 @@
 % !TeX program = latex
-% Informe APA 7. Compatible con latex (pdfTeX), pdfLaTeX y XeLaTeX.
+% Informe APA 7 para latex (pdfTeX) y pdfLaTeX. Fuentes estandar de TeX.
 \RequirePackage{iftex}
 % El comando latex de TeX Live usa pdfTeX: generar PDF en lugar de DVI.
 \ifPDFTeX
@@ -9,32 +9,15 @@
   \PassOptionsToPackage{pdftex}{geometry}
 \fi
 \documentclass[12pt,letterpaper]{article}
-\ifPDFTeX
-  \usepackage[utf8]{inputenc}
-  \usepackage[T1]{fontenc}
-  % Times compatible incluida en la distribucion TeX; sin fuentes del sistema.
-  \usepackage{mathptmx}
-  \IfFileExists{spanish.ldf}{%
-    \usepackage[spanish,es-tabla]{babel}
-  }{%
-    \usepackage{babel}
-    \babelprovide[import,main]{spanish}
-  }
-\else
-\usepackage{fontspec}
-% Nimbus Roman es una tipografia compatible con Times; disponible en TeX Live.
-\IfFontExistsTF{Times New Roman}{\setmainfont{Times New Roman}}{%
-  \IfFileExists{/usr/share/fonts/opentype/urw-base35/NimbusRoman-Regular.otf}{%
-    \setmainfont{NimbusRoman}[Path=/usr/share/fonts/opentype/urw-base35/,
-      Extension=.otf,UprightFont=*-Regular,BoldFont=*-Bold,
-      ItalicFont=*-Italic,BoldItalicFont=*-BoldItalic]
-  }{\setmainfont{TeX Gyre Termes}}%
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}
+\IfFileExists{spanish.ldf}{%
+  \usepackage[spanish,es-tabla]{babel}
+}{%
+  \usepackage{babel}
+  \babelprovide[import,main]{spanish}
 }
-\setsansfont{Latin Modern Sans}
-\setmonofont[Scale=0.84]{Latin Modern Mono Light}
-\usepackage{polyglossia}
-\setdefaultlanguage{spanish}
-\fi
 \usepackage[margin=2.54cm,headheight=16pt,headsep=12pt]{geometry}
 \usepackage{setspace,indentfirst}
 \doublespacing

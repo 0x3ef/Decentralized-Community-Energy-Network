@@ -13,3 +13,7 @@ pdf:
 
 clean:
 	rm -rf build
+
+.PHONY: archivo-unico
+archivo-unico:
+	python unir_fuentes.py
