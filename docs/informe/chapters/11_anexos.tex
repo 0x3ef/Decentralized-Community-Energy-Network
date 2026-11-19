@@ -1,0 +1,191 @@
+\chapter{Funciones principales de los contratos}
+Este anexo describe las funciones de negocio y grupos heredados relevantes. Los getters generados por mappings y variables públicas, constructores y detalles internos se consultan en el código Solidity y ABI de la revisión fijada. No se presenta esta síntesis como reemplazo de una especificación formal del contrato.
+
+\section{TimelockController}
+\begin{longtable}{L{.37\linewidth}L{.53\linewidth}}
+\toprule Función o grupo & Uso \\ \midrule\endfirsthead
+\toprule Función o grupo & Uso \\ \midrule\endhead
+\code{schedule}, \code{scheduleBatch} & Programar una acción o grupo con predecesor, salt y retraso.\\
+\code{execute}, \code{executeBatch} & Ejecutar lo programado cuando está listo y los roles lo permiten.\\
+\code{cancel} & Cancelar operaciones pendientes con la autoridad correspondiente.\\
+\code{hashOperation}, \code{hashOperationBatch} & Calcular identificadores deterministas de operaciones.\\
+\code{getMinDelay}, \code{updateDelay} & Consultar el retraso o modificarlo mediante la propia gobernanza.\\
+Consultas y roles & Comprobar si existe, está pendiente, lista o terminada una operación; consultar, otorgar, revocar o renunciar a roles.\\
+\bottomrule
+\end{longtable}
+\section{CommunityRegistry}
+\begin{longtable}{L{.37\linewidth}L{.53\linewidth}}
+\toprule Función o grupo & Uso \\ \midrule\endfirsthead
+\toprule Función o grupo & Uso \\ \midrule\endhead
+\code{propose}, \code{transition} & Crear propuesta y aplicar transiciones autorizadas de comunidad y operador.\\
+\code{configurePrice}, \code{bindProtocol} & Fijar precio bajo restricciones de estado y vincular contratos válidos.\\
+\code{applyMembership}, \code{setMembership} & Solicitar y administrar pertenencia de una wallet.\\
+\code{registerNode}, \code{authorizeMeter} & Asociar nodo a propietario y autorizar o revocar medidor.\\
+\code{isActive}, \code{isMember} & Consultar elegibilidad de comunidad y participante.\\
+\code{pause}, \code{unpause} & Aplicar o retirar pausa con roles correspondientes; AccessControl añade administración de permisos.\\
+\bottomrule
+\end{longtable}
+\section{SUNToken}
+\begin{longtable}{L{.37\linewidth}L{.53\linewidth}}
+\toprule Función o grupo & Uso \\ \midrule\endfirsthead
+\toprule Función o grupo & Uso \\ \midrule\endhead
+\code{mint} & Emitir con MINTER\_ROLE, cantidad positiva y crédito único.\\
+\code{anchorAccounting} & Vincular una referencia de evidencia a un crédito emitido, una sola vez.\\
+\code{balanceOf}, \code{totalSupply}, \code{transfer} & Consultar saldo/oferta y transferir unidades existentes.\\
+\code{approve}, \code{allowance}, \code{transferFrom} & Autorizar gasto, consultar su límite y usar autorización.\\
+\code{burn}, \code{burnFrom} & Quemar unidades propias o autorizadas; una quema genérica no equivale a compensación protocolaria.\\
+\code{pause}, \code{unpause}, roles & Controlar pausa, permisos y soporte de interfaces; \code{_update} aplica reglas heredadas a movimientos.\\
+\bottomrule
+\end{longtable}
+\section{CommunitySettlement}
+\begin{longtable}{L{.37\linewidth}L{.53\linewidth}}
+\toprule Función o grupo & Uso \\ \midrule\endfirsthead
+\toprule Función o grupo & Uso \\ \midrule\endhead
+\code{submit} & Presentar un lote con compromiso y cantidades por la autoridad del oráculo.\\
+\code{finalize}, \code{reject} & Resolver un lote con la autoridad y periodo de revisión requeridos.\\
+\code{supersede} & Reemplazar un lote no utilizado bajo las restricciones que impiden corregir derechos ya consumidos.\\
+\code{issue} & Verificar prueba y autorización y emitir sin superar el total aprobado.\\
+\code{retire} & Verificar consumo entregado completo, evitar repeticiones y quemar SUN con allowance.\\
+\code{leaf}, \code{bindVault}, \code{allocationRoot} & Calcular hoja, vincular una sola custodia válida y exponer compromiso finalizado.\\
+Validaciones internas & \code{_check} y \code{_financiallyUsed} comprueban autorización y uso económico previo.\\
+\bottomrule
+\end{longtable}
+\section{NativeSettlementVault}
+\begin{longtable}{L{.37\linewidth}L{.53\linewidth}}
+\toprule Función o grupo & Uso \\ \midrule\endfirsthead
+\toprule Función o grupo & Uso \\ \midrule\endhead
+\code{deposit} & Depositar ETH nativo con precio máximo autorizado.\\
+\code{depositSUN} & Transferir SUN al escrow con aprobación previa.\\
+\code{reserve} & Reservar ambos activos para una asignación probada; exige autoridad de liquidación.\\
+\code{execute} & Entregar SUN y acreditar ingreso atómicamente, si la reserva sigue habilitada; puede invocarla cualquier cuenta.\\
+\code{withdraw}, \code{withdrawSUN} & Retirar ETH disponible o SUN no reservados.\\
+\code{withdrawEarnings} & Cobrar ETH ganado; no convierte SUN ni genera otro derecho.\\
+\code{cancel} & Cancelar reserva por el consumidor bajo suspensión o vencimiento del plazo de siete días.\\
+\code{leaf} y consultas & Construir hoja y consultar disponibles, reservas, límites y energía entregada por nodo. La función interna \code{_pay} comprueba el envío ETH.\\
+\bottomrule
+\end{longtable}
+
+\chapter{Protocolo de demostración manual}
+\section{Preparación}
+Utilizar una instalación local existente y conservar su configuración original. Importar únicamente cuentas locales de prueba a perfiles separados para gobernanza, productor y consumidor. Verificar el origen del sitio y la dirección vinculada al usuario. No mostrar archivos cifrados, contraseñas o claves durante la grabación. Las direcciones y credenciales deben obtenerse de la instalación activa; no copiar hashes o contratos de un ejemplo anterior.
+
+\begin{lstlisting}[language=bash]
+source .venv/bin/activate
+make simulate
+make doctor
+curl --max-time 30 -sS http://127.0.0.1:8000/ready
+\end{lstlisting}
+Dejar observado un intervalo completo y esperar el periodo de gracia. Confirmar exportación elegible, lote nuevo y estado CHALLENGEABLE. El productor habitual de la simulación continua es el hogar 5; los hogares 3 y 4 aportan demanda según el perfil. Los hogares 1 y 2 se reservan al escenario finito. Si se inicia de noche, no debe esperarse exportación solar por el mero paso del tiempo.
+
+\section{Recorrido observable}
+\begin{enumerate}
+\item Consultar hogar, dispositivo, fuente SIMULATED, salud, calidad y evolución del intervalo.
+\item Abrir Liquidación, fijar el identificador del lote y revisar cantidades y política.
+\item Con la cuenta autorizada de gobernanza, preparar finalización, programar en timelock, firmar, esperar disponibilidad y ejecutar. Confirmar FINALIZED.
+\item En el productor, comprobar el crédito ISSUED y su saldo SUN; no equiparar saldo histórico total con emisión del nuevo lote.
+\item Autorizar SUN al vault y depositar la cantidad necesaria. Confirmar la transacción y disponibilidad en custodia.
+\item En el consumidor de una asignación del mismo lote, depositar ETH suficiente con límite de precio válido. Confirmar antes de repetir.
+\item Observar reserva y SETTLED. Comprobar SUN recibido e ingreso del productor. Con fondos por sí solo no cierra esta etapa.
+\item En Compensación, autorizar SUN a CommunitySettlement y compensar el consumo completo habilitado. Confirmar retiro y reducción de SUN.
+\item En el productor, retirar ingresos y contrastar el estado de cuenta y la transacción. El cambio neto de wallet incluye gas.
+\item Mostrar Transacciones y Configuración y cerrar explicando alcance local y límites físicos y regulatorios.
+\end{enumerate}
+Si una operación queda pendiente, revisar la confirmación de la extensión, RPC, hash, recibo y nonce antes de reenviarla. Un cambio de red o borrado del historial de la extensión no deshace una transacción ya minada. No reconstruir Anvil para forzar confirmaciones de una grabación.
+
+\section{Criterios de aceptación del video}
+El video debe mantener trazabilidad de lote, comunidad y participantes; presentar estados confirmados, no solo solicitudes; distinguir aprobación, depósito, liquidación y retiro; y explicar que el saldo inicial de prueba no es ingreso energético. Las esperas pueden editarse, sin presentar un estado histórico como resultado nuevo. Si falta financiación o una operación falla, documentar el estado y su causa en lugar de modificar SQL.
+
+\chapter{Consultas de diagnóstico de solo lectura}
+Las consultas siguientes corresponden al esquema inspeccionado y no alteran registros. Deben ejecutarse contra la base correcta, sin imprimir cadenas de conexión ni secretos.
+
+\section{Recepción y calidad}
+\begin{lstlisting}[language=SQL]
+SELECT now() AS hora_bd,
+       max(measured_at) AS ultima_medicion,
+       max(received_at) AS ultima_recepcion,
+       count(*) FILTER (
+         WHERE received_at > now() - interval '5 minutes'
+       ) AS recibidos_5_min
+FROM telemetry_messages;
+
+SELECT d.device_code, t.quality_status,
+       count(*) AS mensajes, max(t.measured_at) AS ultima
+FROM telemetry_messages t
+JOIN devices d ON d.id = t.device_id
+WHERE t.received_at > now() - interval '10 minutes'
+GROUP BY d.device_code, t.quality_status
+ORDER BY d.device_code, t.quality_status;
+\end{lstlisting}
+
+\section{Intervalos elegibles posteriores a recuperación}
+\begin{lstlisting}[language=SQL]
+SELECT e.id, e.interval_start, e.eligible_export_wh
+FROM energy_intervals e
+JOIN community_nodes n ON n.home_id = e.home_id
+JOIN community_native_deployments d
+  ON d.community_id = n.community_id
+WHERE e.quality_status = 'FINALIZED'
+  AND e.eligible_export_wh > 0
+  AND (d.accounting_start IS NULL
+       OR e.interval_start >= d.accounting_start)
+ORDER BY e.interval_start DESC;
+\end{lstlisting}
+Este resultado identifica candidatos de evidencia; aún deben pasar política, lote y finalización. No es una consulta de tokens ya emitidos.
+
+\section{Estado de lotes, claims y asignaciones}
+\begin{lstlisting}[language=SQL]
+SELECT id, interval_start, status, archived
+FROM native_settlement_batches
+ORDER BY interval_start DESC LIMIT 20;
+
+SELECT b.id AS lote, b.status AS estado_lote, b.archived,
+       c.kind, c.energy_wh, c.status AS estado_claim
+FROM native_settlement_claims c
+JOIN native_settlement_batches b ON b.id = c.batch_id
+ORDER BY b.interval_start DESC LIMIT 30;
+
+SELECT a.id, a.energy_wh, a.due_wei,
+       a.status, a.funding_status, b.archived
+FROM native_interval_allocations a
+JOIN native_settlement_batches b ON b.id = a.batch_id
+ORDER BY b.interval_start DESC LIMIT 30;
+\end{lstlisting}
+\code{kind=0} corresponde a emisión y \code{kind=1} a retiro por consumo. Los datos SQL son proyecciones y se contrastan con recibos/eventos del despliegue activo antes de afirmar éxito económico.
+
+\chapter{Reproducción del informe y fuentes de evidencia}
+\section{Compilación}
+El proyecto LaTeX usa XeLaTeX, latexmk, Polyglossia, TikZ, fontspec, booktabs, longtable y listings. No necesita shell-escape, descarga de imágenes ni una base de datos. Las fuentes son Latin Modern incluidas habitualmente en TeX Live.
+\begin{lstlisting}[language=bash]
+cd docs/informe
+make pdf
+# Resultado: build/informe.pdf
+\end{lstlisting}
+Como alternativa, importar la carpeta completa a Overleaf, seleccionar XeLaTeX y definir \code{informe.tex} como documento principal. La fecha y revisión del informe son explícitas; no cambian al recompilar. El PDF es un resultado generado y los archivos auxiliares se excluyen de Git.
+
+\section{Qué se conserva en el paquete}
+\begin{itemize}
+\item Fuentes LaTeX, capítulos, referencias y Makefile de compilación.
+\item Manifiesto de revisión, tablas, cabecera Alembic, OpenAPI y campañas de prueba, sin secretos.
+\item Copia del escenario local público versionado, con procedencia y hash del archivo original.
+\item Registro de la suite seleccionada ejecutada para esta revisión documental.
+\end{itemize}
+El manifiesto \code{evidencia/manifest.json} distingue evidencia versionada de registros locales de trabajo que no forman parte del repositorio general. Los resúmenes de campañas anteriores no convierten esos logs en un conjunto público completo. Las observaciones manuales se identifican como comunicación aportada, sin incorporar archivos de cuentas o datos privados.
+
+\section{Glosario}
+\begin{longtable}{L{.24\linewidth}L{.66\linewidth}}
+\toprule Término & Significado en este proyecto \\ \midrule\endfirsthead
+\toprule Término & Significado en este proyecto \\ \midrule\endhead
+DePIN & Capa de infraestructura y nodos de medición; en la demostración las fuentes son simuladas.\\
+DeFi & Reglas de activos, custodia y liquidación mediante contratos; no implica descentralización total.\\
+EVM / Anvil & Entorno de ejecución de contratos y nodo local de prueba.\\
+ERC-20 / SUN & Estándar de token fungible y crédito energético del protocolo.\\
+ETH / wei & Activo nativo y unidad mínima; un ETH equivale a $10^{18}$ wei.\\
+Claim & Derecho individual comprometido y probado para emisión o retiro; no es un pago por sí mismo.\\
+Escrow / vault & Custodia de activos y contrato que administra disponibilidad, reservas y salidas.\\
+Nonce de wallet & Número de secuencia de transacción; distinto del nonce del reto de propiedad.\\
+Raíz Merkle & Compromiso resumido del conjunto de hojas; la prueba comprueba pertenencia, no verdad física.\\
+Génesis & Identidad del bloque inicial que diferencia cadenas locales con el mismo chain ID.\\
+Outbox & Trabajo durable vinculado a una transacción de negocio para evitar pérdida y duplicación.\\
+Conciliación & Contraste de proyecciones con recibos/eventos canónicos; no restaura una cadena borrada.\\
+\bottomrule
+\end{longtable}

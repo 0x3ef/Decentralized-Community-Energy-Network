@@ -1,0 +1,27 @@
+\clearpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Referencias y fuentes revisadas}
+\begin{thebibliography}{99}
+\bibitem{readme} Proyecto Solar Energy Market. \textit{Descripción, alcance y limitaciones}. \repo{README.md}. Revisión \code{acb2d31}.
+\bibitem{architecture} Proyecto Solar Energy Market. \textit{Architecture}. \repo{docs/architecture.md}.
+\bibitem{database} Proyecto Solar Energy Market. \textit{Database}. \repo{docs/database.md}. Las referencias antiguas a cabecera se contrastaron con Alembic.
+\bibitem{iot} Proyecto Solar Energy Market. \textit{IoT metering, simulation and verification}. \repo{docs/iot.md}.
+\bibitem{blockchain} Proyecto Solar Energy Market. \textit{Blockchain protocol}. \repo{docs/blockchain.md}.
+\bibitem{settlement} Proyecto Solar Energy Market. \textit{Community energy allocation and settlement}. \repo{docs/community-settlement.md}.
+\bibitem{api} Proyecto Solar Energy Market. \textit{HTTP API}. \repo{docs/api.md}. Contraste adicional con OpenAPI importado en esta revisión.
+\bibitem{start} Proyecto Solar Energy Market. \textit{Getting started}. \repo{docs/getting-started.md}.
+\bibitem{deployment} Proyecto Solar Energy Market. \textit{Deployment and operations}. \repo{docs/deployment.md}; implementación en \repo{scripts/stack.py} y \repo{infrastructure/docker/anvil_supervisor.py}.
+\bibitem{security} Proyecto Solar Energy Market. \textit{Security and trust model}. \repo{SECURITY.md}.
+\bibitem{verification} Proyecto Solar Energy Market. \textit{Verification record}. \repo{docs/verification.md}. Sus conteos principales están fechados por la propia guía en la etapa \code{e061ab0}.
+\bibitem{scenario} Proyecto Solar Energy Market. \textit{Local native scenario}, evidencia JSON versionada. \repo{docs/evidence/local-native-scenario.json}. Copia exacta en el paquete de este informe.
+\bibitem{models} Proyecto Solar Energy Market. Registro de modelos \repo{apps/backend/src/core/models.py} y modelos de \repo{apps/backend/src/modules/settlement/models.py}.
+\bibitem{migration} Proyecto Solar Energy Market. Migración de recuperación. \repo{apps/backend/migrations/versions/20261112_local_recovery.py}.
+\bibitem{allocation} Proyecto Solar Energy Market. Reparto por mayores residuos. \repo{apps/backend/src/modules/community/allocation.py}; política y construcción en \repo{apps/backend/src/modules/settlement/service.py}.
+\bibitem{contracts} Proyecto Solar Energy Market. Contratos vigentes en \repo{contracts/src/CommunityRegistry.sol}, \repo{contracts/src/SUNToken.sol}, \repo{contracts/src/CommunitySettlement.sol} y \repo{contracts/src/NativeSettlementVault.sol}; TimelockController de OpenZeppelin, dependencia fijada por el instalador.
+\bibitem{history} Proyecto Solar Energy Market. Historial Git, desde \code{5b10f35} hasta \code{acb2d31}. Secuencia de cambios inspeccionada para reconstruir fases técnicas, no tiempos de trabajo.
+\bibitem{dbfix} Proyecto Solar Energy Market. Corrección de credenciales. \repo{apps/backend/src/core/docker_database.py}, \repo{scripts/entry_point.sh} y \repo{infrastructure/docker/compose.prototype.yml}; commit \code{acb2d31}.
+\bibitem{manual} Registro operativo compartido por el usuario durante la demostración local, 18 de noviembre de 2026. Consultas SQL, mensajes de aplicación y capturas de estados. Comunicación contextual no equivalente a un ensayo controlado público.
+\bibitem{config} Proyecto Solar Energy Market. \textit{Configuration}. \repo{docs/configuration.md}.
+\bibitem{development} Proyecto Solar Energy Market. \textit{Development and tests}. \repo{docs/development.md}.
+\bibitem{audit} Proyecto Solar Energy Market. \textit{Documentation audit}. \repo{docs/documentation-audit.md}. Registro histórico de consolidación documental.
+\end{thebibliography}

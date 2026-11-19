@@ -1,0 +1,35 @@
+INFORME TECNICO — SOLAR ENERGY MARKET
+
+Contenido
+- informe.tex: documento principal y portada.
+- chapters/: capitulos y anexos.
+- referencias.tex: fuentes con enlaces a la revision tecnica revisada.
+- evidencia/: manifiesto, escenario publico y verificacion seleccionada.
+- Makefile: compilacion local con XeLaTeX y latexmk.
+
+Compilar desde esta carpeta:
+    make pdf
+Resultado:
+    build/informe.pdf
+
+Overleaf
+1. Crear un proyecto cargando el ZIP de las fuentes.
+2. Seleccionar informe.tex como documento principal.
+3. En las opciones del proyecto seleccionar XeLaTeX.
+4. Recompilar. No se requiere shell-escape ni una base de datos.
+
+Personalizacion
+La portada no inventa autor, universidad, programa o tutor. Se pueden agregar
+esos datos en el bloque titlepage de informe.tex. El corte documental y la
+revision tecnica son explicitos y no cambian al recompilar.
+
+Alcance
+Este es un informe retrospectivo, no una guia operativa alternativa. Las guias
+canonicas del repositorio siguen siendo la referencia para instalar y operar.
+Las pruebas completas anteriores se distinguen de las 32 pruebas seleccionadas
+que se ejecutaron durante la elaboracion. No se realizaron nuevos pagos ni se
+modificaron datos SQL para escribir el informe.
+
+Confidencialidad
+El paquete no contiene archivos .env, contrasenas, claves privadas ni keystores.
+Los identificadores de transacciones del escenario corresponden a Anvil local.

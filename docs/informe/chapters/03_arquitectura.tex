@@ -1,0 +1,52 @@
+\chapter{Arquitectura e integración}
+\section{Organización de componentes}
+La solución combina una aplicación modular con procesos de trabajo especializados y contratos EVM. Los contenedores facilitan su despliegue, pero no justifican describirla como un conjunto de microservicios completamente independientes. API, suscriptor y worker comparten modelos y persistencia, y algunas capas consultan directamente mediante sesiones SQLAlchemy.\cite{architecture}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1cm and .55cm]
+\node[box] (iot) {Sensores físicos\\o simulador explícito};
+\node[box,right=of iot] (mqtt) {Mosquitto\\y suscriptor};
+\node[box,right=of mqtt] (db) {PostgreSQL\\SQLModel / Alembic};
+\node[box,below=1.5cm of iot] (web) {React y TypeScript\\Wallet del usuario};
+\node[box,right=of web] (api) {FastAPI\\Reglas y permisos};
+\node[box,right=of api] (worker) {Worker\\Cálculo e indexación};
+\node[box,below=1.5cm of api] (evm) {Contratos EVM\\Registro, SUN y vault};
+\node[box,left=of evm] (gov) {Gobernanza\\Timelock};
+\node[box,right=of evm] (redis) {Redis\\Revocación y actividad};
+\draw[arr] (iot)--(mqtt);
+\draw[arr] (mqtt)--(db);
+\draw[arr] (web)--(api);
+\draw[arr] (api)--(db);
+\draw[arr] (db)--(worker);
+\draw[arr] (worker)--(evm);
+\draw[arr] (gov)--(evm);
+\draw[arr] (web.south) to[out=-60,in=160] node[labelnode,above,sloped]{firma del participante} (evm.west);
+\draw[arr] (api)--(evm);
+\draw[arr] (worker)--(redis);
+\end{tikzpicture}
+\caption{Componentes y relaciones principales. Flechas simplificadas; no representan todas las consultas de lectura.}\label{fig:arquitectura}
+\end{figure}
+
+\section{Frontend}
+React 19 y TypeScript organizan las pantallas; Vite construye los recursos y nginx sirve la aplicación en Docker. TanStack Query maneja consultas y caché; viem participa en las interacciones EVM; Recharts presenta series de energía. Las cantidades monetarias no deben tratarse como flotantes JavaScript: la API devuelve cadenas enteras de wei y el cliente utiliza conversiones y enteros grandes.
+
+El frontend prepara revisión de red, destinatario, valor y argumentos; la extensión EIP-1193 aporta la firma del usuario. No se almacenan claves privadas de participantes en el código de la interfaz. La sesión HTTP y la cuenta conectada deben coincidir con la relación de wallet del servidor para operar fondos propios.
+
+\section{API y autorización}
+El punto de entrada es \code{src.main:app}, con prefijo \code{/api/v1}. FastAPI valida solicitudes y publica OpenAPI. Los servicios comprueban propiedad de hogares, acceso comunitario y permisos. El usuario se autentica con contraseñas bcrypt y JWT; la wallet se verifica con un reto EIP-191 de un solo uso.
+
+La API prepara calldata sin firmar. Un HTTP exitoso al preparar no mueve fondos ni confirma una transacción. Los hashes posteriormente recibidos se siguen y contrastan con la cadena. Las rutas y operaciones inspeccionadas se contabilizan en el capítulo de resultados, sin equipararlas a funciones activas de un marketplace histórico.\cite{api}
+
+\section{Recepción y trabajo asíncrono}
+El suscriptor ejecuta el bucle MQTT y coordina una cola acotada con el procesamiento asíncrono SQL. Confirma mensajes después de la transacción de persistencia. La deduplicación hace que una redelivery por QoS no sume energía dos veces.
+
+El worker procesa contadores, finaliza intervalos, descubre lotes, gestiona outbox, transmite operaciones y audita confirmaciones. Redis aporta latidos y revocación de JWT; no es el libro mayor de pagos. Los fallos terminales permanecen visibles para revisión o reintento explícito.
+
+\section{Transacciones durables e indexación}
+La modificación de negocio y su evento outbox se confirman conjuntamente. Antes de transmitir una operación del oráculo se conservan sus bytes firmados, hash, nonce y origen. Un bloqueo asesor SQL coordina nonces por chain ID, génesis y remitente. Reintentar una respuesta ambigua no debe crear otro pago con un nonce nuevo.
+
+Una operación se refleja como confirmada después de comprobar recibo exitoso, bloque canónico, profundidad y eventos esperados. Las reorganizaciones y los eventos huérfanos exigen reconstrucción de proyecciones o revisión; la aplicación no inventa una reversión económica de lo ya pagado.\cite{architecture,blockchain}
+
+\section{Fronteras de confianza}
+Los contratos validan reglas y pruebas sobre compromisos; no verifican directamente una instalación eléctrica. La confianza permanece en la provisión de medidores, sus credenciales, la revisión del oráculo y la gobernanza. El administrador SQL puede controlar la base de datos: las restricciones y los triggers son controles de integridad, no una afirmación de almacenamiento inviolable. Esta delimitación evita atribuir descentralización total a una infraestructura que todavía depende de servicios autorizados.

@@ -1,0 +1,66 @@
+\chapter{Modelo de datos e integridad}
+\section{Fuente del esquema y estado revisado}
+SQLModel y Alembic son la fuente operativa del esquema. Durante esta revisión se registraron \textbf{44 tablas} y se comprobó la cabecera \code{20261112_local_recovery}. Los archivos SQL históricos y el snapshot OpenAPI v2 no se utilizan para instalar una estructura paralela. Las cifras se refieren a tablas registradas por el código inspeccionado, no a una certificación de que cualquier base del usuario esté migrada correctamente.\cite{database,models,migration}
+
+La imagen Docker incluye TimescaleDB, pero las migraciones vigentes no crean hypertables ni retención automática. Por tanto, se documenta una persistencia PostgreSQL relacional con posibilidad futura de diseño temporal, sin atribuirle particionamiento no implementado.
+
+\section{Dominios principales}
+\begin{longtable}{L{.25\linewidth}L{.65\linewidth}}
+\caption{Agrupación de las tablas vigentes.}\label{tab:dominios}\\
+\toprule Dominio & Tablas y relaciones destacadas \\ \midrule\endfirsthead
+\toprule Dominio & Tablas y relaciones destacadas \\ \midrule\endhead
+Identidad & \code{users}, \code{wallets}, \code{wallet_nonces}. La clave de usuario es \code{users.uid}; las wallets se relacionan con ella.\\
+Infraestructura & \code{homes}, \code{devices}, \code{device_credentials}. El hogar tiene propietario y el dispositivo dos identidades: interna y pública.\\
+Comunidad & \code{energy_communities}, \code{community_memberships}, \code{community_nodes}, \code{meter_authorizations}. Delimitan participación y vínculo del medidor con el nodo.\\
+Telemetría & \code{telemetry_messages}, \code{telemetry_assessments}; lecturas tipadas en \code{smart_meter}, \code{inverter}, \code{battery}, \code{weather}.\\
+Contabilidad & \code{device_counter_snapshots}, \code{energy_power_snapshots}, \code{energy_intervals}, \code{energy_credits}, \code{credit_movements}.\\
+Protocolo nativo & \code{native_settlement_policies}, \code{native_settlement_batches}, \code{native_settlement_claims}, \code{native_interval_allocations}, \code{community_native_deployments}.\\
+Ejecución y proyección & \code{outbox_events}, \code{community_chain_operations}, \code{native_indexed_events}, \code{native_sync_cursors}, \code{native_wallet_transactions}.\\
+Auditoría y recuperación & \code{local_chain_recoveries}, \code{community_energy_ledger}, \code{audit_events}.\\
+Historia retenida & Tablas de órdenes, trades, redenciones, despliegues ERC-20 y obligaciones previas; su existencia no las convierte en flujo nativo activo.\\
+\bottomrule
+\end{longtable}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=.85cm and 1.05cm,box/.append style={text width=3.7cm}]
+\node[box] (u) {Usuario\\\code{users.uid}};
+\node[box,right=of u] (h) {Hogar\\\code{homes.owner_id}};
+\node[box,right=of h] (d) {Dispositivo\\\code{devices.home_id}};
+\node[box,below=of u] (c) {Comunidad y membresía};
+\node[box,below=of h] (n) {Nodo y autorización\\del medidor};
+\node[box,below=of d] (t) {Mensajes y\\lecturas tipadas};
+\node[box,below=of t] (i) {Intervalos y créditos};
+\node[box,left=of i] (b) {Política y lote};
+\node[box,left=of b] (a) {Claims y asignaciones};
+\draw[arr] (u)--node[labelnode,above]{1:N}(h);
+\draw[arr] (h)--node[labelnode,above]{1:N}(d);
+\draw[arr] (u)--(c);
+\draw[arr] (c)--(n);
+\draw[arr] (h)--(n);
+\draw[arr] (n)--(d);
+\draw[arr] (d)--(t);
+\draw[arr] (t)--(i);
+\draw[arr] (c.south) to[out=-70,in=170] (b.west);
+\draw[arr] (b)--(a);
+\draw[arr] (i.south) to[out=-120,in=-70] (a.south);
+\end{tikzpicture}
+\caption{Relaciones selectivas. Las flechas de evidencia indican trazabilidad lógica; no todas corresponden a una FK directa.}\label{fig:datos}
+\end{figure}
+
+\section{Tipos y restricciones}
+La energía se representa en Wh enteros. Las obligaciones y precios nativos utilizan \code{NUMERIC(78,0)} para conservar precisión de enteros compatibles con uint256. En la API se transmiten como cadenas decimales. SUN utiliza 18 decimales y los tiempos de cálculo y eventos son conscientes de zona horaria.
+
+Se aplican restricciones de unicidad para correo y dirección de wallet, secuencia y mensaje por dispositivo, intervalo por hogar, crédito por intervalo, lote por comunidad y periodo, claim por lote/tipo/nodo y operación firmada por outbox. Los eventos indexados incluyen identidad de bloque para conservar versiones huérfanas sin tratarlas como canónicas.
+
+Los bloqueos y las transacciones complementan estas restricciones. Una comprobación previa en Python no evita por sí sola que dos trabajadores concurrentes firmen la misma obligación. El ledger comunitario añade un trigger que rechaza actualización y borrado; un administrador de base de datos sigue teniendo capacidades superiores de mantenimiento, por lo que no se afirma inviolabilidad.
+
+\section{Separación entre evidencia y proyección}
+La base conserva la telemetría, su calidad y las referencias de cálculo. En cambio, saldos, entregas y retiros confirmados tienen autoridad en los contratos. Las tablas nativas contienen proyecciones que deben actualizarse desde recibos y eventos canónicos. Insertar una fila \code{ISSUED} o \code{CONFIRMED} sin transacción no constituiría emisión ni pago.
+
+Las hojas y pruebas Merkle se conservan junto con las cantidades, nodo, medidor, beneficiario y política. No deben regenerarse silenciosamente a partir de estado mutable después de aprobar un lote.
+
+\section{Semillas y recuperación}
+El seed SQLModel crea cinco hogares y quince dispositivos de ejemplo y respeta identidades, contraseñas y revocaciones existentes. El bootstrap gobernado es una fase diferente: despliega contratos y autoriza participantes mediante transacciones reales locales.
+
+La migración de recuperación añade \code{archived}, origen de génesis y un registro \code{local_chain_recoveries}; no elimina la historia. La nueva marca \code{accounting_start} impide volver a emitir desde intervalos anteriores al reemplazo de cadena. Un registro archivado en \code{RECONCILIATION_REQUIRED} conserva evidencia de una cadena perdida: no es una promesa de que esperar restaurará sus fondos.

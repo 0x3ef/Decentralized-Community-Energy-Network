@@ -1,0 +1,67 @@
+\chapter{Verificación y resultados alcanzados}
+\section{Escenario financiero versionado}
+La evidencia principal es \code{docs/evidence/local-native-scenario.json}, con estado \code{VERIFIED}. El archivo identifica comunidad, lote, intervalo, raíz, estados de cuenta y hashes de operaciones. Su intervalo retenido es del 11 de noviembre de 2026, de 01:30 a 01:45 UTC; las horas locales deben convertirse antes de compararlas con una captura. No se afirma que esos hashes sigan disponibles en un Anvil reemplazado posteriormente ni que se puedan buscar en un explorador público.\cite{scenario,verification}
+
+\begin{longtable}{L{.53\linewidth}L{.37\linewidth}}
+\caption{Resultados del escenario local de 5/3 kWh.}\label{tab:escenario}\\
+\toprule Magnitud & Resultado confirmado en el artefacto \\ \midrule\endfirsthead
+\toprule Magnitud & Resultado confirmado en el artefacto \\ \midrule\endhead
+Inyección elegible / demanda & 5 kWh / 3 kWh\\
+Asignación / inyección no asignada & 3 kWh / 2 kWh\\
+Precio aplicado & 0,001 ETH de prueba por kWh\\
+Depósito inicial del consumidor & 0,01 ETH\\
+Pago de las asignaciones & 0,003 ETH\\
+SUN emitidos / entregados / retirados & 5 / 3 / 3 SUN\\
+ETH disponible final del consumidor & 0,007 ETH\\
+Ingreso retirado del productor & 0,003 ETH\\
+Oferta SUN restante & 2 SUN\\
+Pasivos finales del vault & 0,007 ETH\\
+Reservas e ingresos pendientes al finalizar & 0 ETH\\
+\bottomrule
+\end{longtable}
+Las cuentas cierran: 0,01 ETH aportados menos 0,003 ETH retirados por el productor dejan 0,007 ETH respaldando disponibilidad del consumidor; 5 SUN emitidos menos 3 SUN quemados dejan 2 SUN. La energía no asignada no genera por sí misma ingreso: quedan créditos del productor, no otro pago automático.
+
+El escenario incluye credencial inválida, mensajes repetidos y reanudación mediante journal. Los scripts conservan hashes antes de esperar recibos para no repetir depósitos, retiros o quema. \code{blockchain-check} comparte el mismo escenario con \code{demo-scenario}: reejecutarlo después de completar no crea otro pago. Tras una recuperación se utilizan bases de contadores y un intervalo posterior al corte; no se borran journals para forzar reutilización de créditos.
+
+\section{Resultados de pruebas por campaña}
+\begin{longtable}{L{.24\linewidth}L{.26\linewidth}L{.39\linewidth}}
+\caption{Evidencias automatizadas separadas por alcance y origen.}\label{tab:pruebas}\\
+\toprule Campaña / fuente & Resultado retenido & Interpretación y límites \\ \midrule\endfirsthead
+\toprule Campaña / fuente & Resultado retenido & Interpretación y límites \\ \midrule\endhead
+Integración documentada en \code{e061ab0} & 38 contratos; 48 backend; 86 IoT; 35 frontend; 11 navegador. & Cifras históricas de \code{docs/verification.md}; no son el total actual ni se vuelven a ejecutar para esta redacción.\\
+Revisión del despliegue \code{2ef7536} & Backend: 80 pruebas; IoT: 95 pruebas, 88,18\% de cobertura. & Registros de campañas locales posteriores; no sumables a los anteriores como pruebas distintas.\\
+Conservación SQL de recuperación & 44 tablas con claves conservadas; contraseñas, propiedad y payloads históricos preservados. & Comparación local con respaldo de inspección; no certifica restauración de cualquier desastre.\\
+Escenario posterior a recuperación & Ciclo de 5/3 kWh verificado nuevamente. & Ejecución local retenida en logs de trabajo; conserva el mismo alcance sintético y no público.\\
+Inserción validada \code{46d5da8} & 26 pruebas seleccionadas de pipeline y ciclo de vida. & Incluye PostgreSQL/Anvil aislados y rechazo de credenciales/datos alterados; no equivale a toda la suite.\\
+Comprobación de este informe & 32 pruebas de ciclo de vida aprobadas, una advertencia de dependencia. & Suite seleccionada ejecutada durante la revisión; no se lanzó una campaña financiera nueva.\\
+\bottomrule
+\end{longtable}
+La cobertura de IoT es una medición de líneas instrumentadas de esa campaña; no es cobertura del sistema completo, garantía de corrección o índice de seguridad. Los warnings se retienen y no se convierten en fallos silenciosos. Los manifiestos de evidencia adjuntos resumen los resultados sin incluir logs privados ni credenciales.
+
+\section{Comprobaciones estructurales actuales}
+En la revisión base se importó el registro de modelos, se generó OpenAPI desde la aplicación y se consultó Alembic sin conectar una nueva base de negocio. Los resultados son 44 tablas, 71 paths y 80 operaciones HTTP, con cabecera \code{20261112_local_recovery}. Estos números incluyen estructuras y endpoints históricos retenidos: no son 80 funcionalidades nativas distintas expuestas al usuario.
+
+Se detectaron diferencias temporales de documentación: la auditoría anterior menciona 43 tablas y algunos textos citan \code{20261111_chain_identity} como última revisión; el código actual añade la recuperación local. Asimismo, una guía histórica separa setup y demo, mientras el ciclo actual unifica el arranque y conserva demo como alias. El informe utiliza el código en la revisión fijada y conserva los textos anteriores como evidencia de su etapa, sin extender sus conteos a la versión actual.
+
+\section{Matriz de cumplimiento}
+\begin{longtable}{L{.29\linewidth}L{.18\linewidth}L{.42\linewidth}}
+\caption{Estado de objetivos frente a la evidencia revisada.}\label{tab:cumplimiento}\\
+\toprule Capacidad & Estado & Sustento o pendiente \\ \midrule\endfirsthead
+\toprule Capacidad & Estado & Sustento o pendiente \\ \midrule\endhead
+Telemetría autenticada y auditable & Logrado localmente & Validación v2, deduplicación, fuente y calidad; pruebas con broker y pipeline.\\
+Contabilidad por intervalos & Logrado localmente & Contadores, límites UTC, gracia y exclusión de evidencia defectuosa.\\
+Gobernanza de lotes & Implementado y demostrado & Timelock, prepare de acciones, firmas y finalización antes de emisión.\\
+Emisión acotada y retiro por consumo & Verificado en escenario & Claims únicos, prueba, límite agregado y quema de consumo entregado.\\
+Liquidación financiada & Verificado en escenario & Custodia doble, reserva, entrega SUN y retirada de ingresos ETH.\\
+Recuperación sin eliminar SQL & Verificado en ensayo local & Comparación de tablas/identidades, archivo y corte contable.\\
+Interfaz operativa en español & Implementada y probada localmente & Tests de componentes/navegador y observaciones manuales; no auditoría completa de accesibilidad.\\
+Medición física calibrada & Pendiente & No hay evidencia de instalación y contraste metrológico.\\
+Sepolia y MetaMask público & Pendiente de verificación & Tooling disponible; sin aceptación pública registrada.\\
+Facturación y operación comercial & Fuera del resultado actual & Sin integración de factura ni validación regulatoria de venta.\\
+\bottomrule
+\end{longtable}
+
+\section{Lectura de los resultados}
+El aporte principal es cerrar un ciclo de software con respaldo verificable en la misma red de prueba: datos, aprobación, emisión, fondos, entrega y salidas. La evidencia respalda integridad funcional en escenarios ensayados y resolución de fallos concretos. No respalda una estimación de ahorro, reducción de emisiones, capacidad máxima de usuarios, latencia p95, transacciones por segundo, disponibilidad anual o coste de gas en producción. Esas métricas requieren experimentos propios, condiciones de carga y mediciones no presentes.
+
+Las observaciones manuales mostraron progreso de \code{valid} a \code{PROCESSED}, exclusión de intervalos rechazados y diagnósticos de recursos insuficientes. Que un estado bloquee una liquidación es parte del mecanismo de seguridad, no necesariamente un defecto; cuando hay un error real se necesitan evidencias y diagnóstico, no cambios directos del estado SQL.

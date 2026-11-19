@@ -1,0 +1,57 @@
+\chapter{Proceso de desarrollo y decisiones}
+\section{Estrategia de implementación}
+El historial de cambios muestra una construcción incremental: primero una base de contabilidad y operación, después endurecimiento de IoT y persistencia, posteriormente un protocolo gobernado con ETH nativo y, finalmente, integración de interfaz, pruebas y recuperación. Esta reconstrucción corresponde a cambios observables en Git; no se atribuye una metodología formal Scrum, una duración de sprints ni un equipo de tamaño determinado porque esas evidencias no están documentadas.
+
+\begin{longtable}{L{.18\linewidth}L{.24\linewidth}L{.47\linewidth}}
+\caption{Hitos técnicos identificables en el historial.}\label{tab:hitos}\\
+\toprule Etapa & Revisiones representativas & Trabajo observado \\ \midrule\endfirsthead
+\toprule Etapa & Revisiones representativas & Trabajo observado \\ \midrule\endhead
+Base funcional & \code{5c1e686}, \code{9ff670f} & Prototipo comunitario inicial y espacio de trabajo conectado a la API.\\
+IoT y semillas & \code{a3add96}, \code{7b4f894}, \code{ba3ea71} & Física coordinada por hogar, reconexión, deduplicación y provisión con modelos SQLModel.\\
+Protocolo gobernado & \code{71882e7}, \code{ea79b35} & Registro de comunidades y liquidación nativa con separación de roles y acciones sin firma preparadas por API.\\
+Automatización & \code{7c87a83}, \code{9b95d24} & Trabajador de intervalos, operaciones durables, conciliación y procedencia de telemetría v2.\\
+Interfaz e integración & \code{99fd0ef}, \code{e061ab0} & Interfaz en español, escenario gobernado y verificación de extremo a extremo local.\\
+Documentación & \code{aa44223} & Consolidación de guías y distinción entre protocolo activo y artefactos históricos.\\
+Planificación y gobernanza & \code{0fdf5c8}, \code{62b5c7e} & Muestreo alineado con UTC, aprobación manual de lotes y corrección del argumento de intervalo.\\
+Operación persistente & \code{2ef7536} & Ciclo Docker unificado, checkpoints atómicos y recuperación sobre la misma base SQL.\\
+Escenario desde SQL & \code{46d5da8} & Inserción validada de lecturas y verificación real del ciclo ETH/SUN.\\
+Credenciales Docker & \code{acb2d31} & Conservación de credenciales originales y adaptación únicamente del endpoint interno.\\
+\bottomrule
+\end{longtable}
+Los cambios se concentran en registros de Git del 10, 11 y 18 de noviembre de 2026. Las fechas de autor, integración y ejecución no son necesariamente equivalentes; el orden de fases anterior es lógico y técnico, no una estimación de esfuerzo. La revisión base del informe es anterior a la incorporación de este documento.\cite{history}
+
+\section{Decisiones que definieron el resultado}
+\subsection{Un único modelo de datos vigente}
+Se sustituyó el uso operativo de semillas y diagramas SQL desactualizados por modelos SQLModel y migraciones Alembic. Las semillas crean identidades y dispositivos; no insertan créditos pagados ni transacciones confirmadas ficticias. La provisión gobernada añade transacciones reales de autorización en la red local.
+
+\subsection{Evidencia antes de emisión}
+La llegada de una lectura no ejecuta un mint. La emisión requiere intervalos elegibles, un compromiso de lote, revisión, finalización y una prueba válida. Esta decisión evita que un dato arbitrario o una cifra del dashboard se trate como derecho económico confirmado.
+
+\subsection{Custodia y liquidación con fondos reales de la red de prueba}
+El protocolo nativo utiliza un vault que reserva tanto los SUN del productor como el ETH del consumidor. Se evita reconocer pagos únicamente incrementando columnas SQL. La transferencia económica ocurre en contrato; el servidor indexa y reconcilia su resultado.
+
+\subsection{Separación de automatización y autoridad}
+Los servicios automatizan recepción, cálculo, presentación e indexación. La gobernanza finaliza lotes y los participantes firman depósitos y salidas. En el escenario automatizado local, las firmas de prueba sustituyen las intervenciones manuales, sin convertir esa comodidad en política pública de operación.
+
+\section{Incidencias y correcciones}
+\begin{longtable}{L{.25\linewidth}L{.32\linewidth}L{.32\linewidth}}
+\caption{Problemas encontrados y respuesta aplicada.}\label{tab:incidencias}\\
+\toprule Incidencia & Diagnóstico o efecto & Corrección o tratamiento \\ \midrule\endfirsthead
+\toprule Incidencia & Diagnóstico o efecto & Corrección o tratamiento \\ \midrule\endhead
+MQTT desconectado, código 4 & Publicación intentada sin sesión aceptada o tras pérdida del broker. & Esperar CONNACK, reconectar con límites, conservar muestra y secuencia, y separar identificadores de clientes.\\
+Intervalos sin límites exactos & Iniciar el ciclo en un segundo arbitrario podía desplazar todas las muestras. & Planificación por ranuras UTC y límites contables; no rellenar cortes no observados.\\
+Argumento de constructor incorrecto & El simulador no iniciaba al pasar la duración contable al generador equivocado. & Mover la opción a SimulationConfig y verificar el arranque.\\
+Red Docker inexistente & Contenedores antiguos referían una red ya reemplazada. & Un único proyecto y archivos Compose; recrear contenedores reteniendo volúmenes.\\
+Estado Anvil truncado & El nodo no podía interpretar su archivo de estado. & Checkpoints validados y reemplazo atómico; fallback previo o recuperación explícita.\\
+Contratos sin bytecode & La DB retenía direcciones de una cadena perdida; llamadas fallaban. & Cuarentena de proyecciones y reemplazo local auditado, sin replay de pagos.\\
+Contraseña PostgreSQL rechazada & Compose forzaba credenciales que podían diferir de las del volumen. & Conservar DATABASE\_URL y adaptar solo host/puerto; no rotar automáticamente el rol.\\
+Cuenta MetaMask equivocada & Sesión de aplicación y permisos de la extensión seleccionaban identidades distintas. & Comparar direcciones, verificar propiedad y separar perfiles del navegador.\\
+Asignación sin fondos o sin SUN & Saldos en wallet no equivalían a activos depositados. & Exponer estados y exigir depósitos/allowances antes de reservar.\\
+\bottomrule
+\end{longtable}
+Las dos últimas incidencias también se observaron en la demostración manual compartida. Su solución operativa no se presenta como un cambio de código no implementado: la selección automática de cuenta por la extensión sigue requiriendo una experiencia de usuario más clara.
+
+\section{Lecciones del proceso}
+La integración requirió tratar la identidad y persistencia de la cadena como parte del dominio. Un chain ID reutilizado no identifica por sí solo la misma red; la génesis y los contratos importan. Asimismo, una prueba aislada de un generador no garantiza un intervalo contable completo, y un endpoint saludable no demuestra que una asignación haya terminado.
+
+El trabajo dejó mecanismos explícitos para retener evidencia fallida en lugar de ocultarla. La consecuencia es que pueden permanecer intervalos rechazados o lotes archivados visibles para auditoría. Esta retención es deliberada: el estado histórico no debe cambiarse manualmente para fabricar una demostración exitosa.

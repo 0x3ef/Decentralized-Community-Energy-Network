@@ -1,0 +1,68 @@
+{
+  "status": "VERIFIED",
+  "community_id": "4f10f6a7-e64a-5cc0-8fda-f51e05e7fb91",
+  "batch": {
+    "id": "6c2d4eca-3884-4eeb-bbb7-7c5734a4804a",
+    "community_id": "4f10f6a7-e64a-5cc0-8fda-f51e05e7fb91",
+    "chain_batch_id": "0x3d6176b31bf7001bb082081c5866e47432f39a85d75ead2206aa9ce3bd132653",
+    "interval_start": "2026-11-11T01:30:00Z",
+    "interval_end": "2026-11-11T01:45:00Z",
+    "status": "FINALIZED",
+    "root": "0xa5dcdc41f491bda54673dcae475523d07dc902aaa20116ca0cca3a61d18d5574",
+    "injection_wh": 5000,
+    "consumption_wh": 3000,
+    "allocated_wh": 3000,
+    "unallocated_wh": 2000,
+    "uncompensated_wh": 0,
+    "total_due_wei": "3000000000000000",
+    "policy_id": "f1476995-d1eb-4375-8bfd-9214895fbce6"
+  },
+  "consumer_statement": {
+    "user_id": "8e7eaf48-6ce2-5a6e-8a96-1f697f8fa4c8",
+    "asset": "Anvil ETH",
+    "available_wei": "7000000000000000",
+    "reserved_wei": "0",
+    "claimable_wei": "0",
+    "settled_entitlement_wei": "0",
+    "withdrawn_earnings_wei": "0",
+    "unsettled_due_wei": "0",
+    "retired_wh": 3000,
+    "block_number": 1761
+  },
+  "producer_statement": {
+    "user_id": "83e1cdab-29a6-57a1-a7f9-57677a0ca618",
+    "asset": "Anvil ETH",
+    "available_wei": "0",
+    "reserved_wei": "0",
+    "claimable_wei": "0",
+    "settled_entitlement_wei": "3000000000000000",
+    "withdrawn_earnings_wei": "3000000000000000",
+    "unsettled_due_wei": "0",
+    "retired_wh": 0,
+    "block_number": 1761
+  },
+  "sun_supply_units": "2000000000000000000",
+  "vault_liabilities_wei": "7000000000000000",
+  "transactions": {
+    "deposit:consumer": {
+      "transaction_hash": "0x76977145b6f99907936466dc0b130f229f00cdf78bc3dafe90aaf651af8ee843"
+    },
+    "approve_sun:producer": {
+      "transaction_hash": "0xd8173ee8a52c4129385deb3e99ecf921609dd859e73df96a6505f3a55b4d19e4"
+    },
+    "escrow_sun:producer": {
+      "transaction_hash": "0x0997aaa5790801894637902e9c5ab3b5c5d1bea98e8e17d62b394e2131255740"
+    },
+    "approve_retirement:consumer": {
+      "transaction_hash": "0x2e5498244bd5b5c6b3fde0ab19bc0e65a0f942ba61978b65a905b889c31c3b2f"
+    },
+    "retire:consumer": {
+      "transaction_hash": "0x9e40a0a44cfd17a3ae830f252afdd439732df75d2d3d943d35995d4543225345"
+    },
+    "withdraw_earnings:producer": {
+      "transaction_hash": "0x736df65871ba3587331da813ca7476e6b6f0a94527b75322394d11cecb67dcf5"
+    }
+  },
+  "notice": "Actual local MQTT, workers, confirmed test ETH and SUN. No physical routing or utility bill alteration.",
+  "execution_environment": "Local Anvil 31337; actual MQTT, HTTP, worker and confirmed EVM transactions. Not Sepolia."
+}

@@ -1,0 +1,59 @@
+\chapter{Despliegue, continuidad y seguridad}
+\section{Ciclo de vida Docker}
+El punto de entrada operativo es \code{scripts/stack.py}, invocado por Make. Todos los comandos comparten el proyecto original y los archivos Compose canónicos. El proyecto selecciona los volúmenes persistentes; cambiarlo para evitar un error puede conectar otra instalación y ocultar los registros antiguos.
+
+\begin{longtable}{L{.23\linewidth}L{.67\linewidth}}
+\caption{Comandos mantenidos y efecto sobre la instalación.}\label{tab:comandos}\\
+\toprule Comando & Efecto \\ \midrule\endfirsthead
+\toprule Comando & Efecto \\ \midrule\endhead
+\code{make setup} / \code{make up} & Construyen lo necesario, aplican migraciones, comisionan o verifican el protocolo local y levantan la aplicación conservando identidades existentes.\\
+\code{make simulate} & Levanta la aplicación completa y el simulador registrado; no requiere dejar una app parcial iniciada por otro archivo Compose.\\
+\code{make doctor} / \code{make ps} & Inspeccionan dependencias, disco, despliegue, readiness y contenedores.\\
+\code{make backup} & Exporta un archivo SQL privado y verifica su estructura con pg\_restore.\\
+\code{make down} & Detiene servicios y conserva volúmenes.\\
+\code{make recover} & Recupera una instalación local sobre el mismo PostgreSQL; si es necesario reemplaza cadena y archiva historia económica.\\
+\code{make clean} & Elimina únicamente artefactos de compilación de contratos, no registros ni volúmenes.\\
+\code{make demo-scenario} & Ejecuta o reanuda la prueba finita MQTT/API/EVM de 5/3 kWh.\\
+\code{make blockchain-check} & Inserta telemetría validada directamente y verifica el mismo escenario; no prueba el transporte MQTT.\\
+\bottomrule
+\end{longtable}
+Los servicios incluyen PostgreSQL/TimescaleDB, Redis, Mosquitto, Anvil, inicialización de estado, migración, API, worker, suscriptor, frontend y simulador opcional. API, worker y suscriptor esperan migración correcta y dependencias saludables. Los puertos públicos locales se limitan a loopback: 8080 para frontend, 8000 para API, 8545 para RPC y 1883 para MQTT.\cite{deployment,start}
+
+\section{Persistencia EVM y recuperación}
+La pérdida de Anvil fue una limitación operativa relevante: podían conservarse usuarios y lecturas mientras las direcciones almacenadas ya no contenían contratos. El error \code{BadFunctionCallOutput} y la ausencia de bytecode no se resuelven acreditando saldos en SQL.
+
+El supervisor actual mantiene snapshots validados de hasta 128 MiB, con escritura en archivo temporal, fsync y reemplazo atómico; conserva un checkpoint anterior completo. Obtiene snapshots cada 30 segundos y durante la parada ordenada. Limita estados históricos y evita el crecimiento no controlado de logs mediante rotación. Si el snapshot actual falla, intenta el previo. Si ambos son inválidos, el arranque se detiene; no continúa silenciosamente en una cadena vacía.
+
+Un corte abrupto puede perder operaciones posteriores al último checkpoint. Por eso conservar un archivo válido no elimina la necesidad de conciliación. La identidad de génesis se preserva y se comprueba; los relojes de minería se ajustan sobre el último estado cargado para no quedar atascados cerca de la fecha inicial.
+
+Cuando la cadena es irrecuperable, \code{make recover}:
+\begin{enumerate}
+\item Detiene procesos que escriben y verifica acceso al mismo proyecto y base.
+\item Crea un respaldo SQL privado verificable y conserva configuración y journals.
+\item Archiva snapshots de Anvil y el historial financiero relacionado con la cadena perdida.
+\item Registra una recuperación con referencias antiguas/nuevas y conserva las filas.
+\item Despliega contratos locales nuevos y reafirma identidades y autorizaciones originales.
+\item Fija un corte contable para evitar nueva emisión de energía histórica.
+\item Conserva un marcador de progreso, checkpoint y configuración para poder reanudar una interrupción.
+\end{enumerate}
+Restaurar SQL no reconstruye almacenamiento EVM, recibos ni saldos. Los lotes archivados mantienen evidencia histórica; el usuario no debe esperar que una conciliación automática resucite una cadena borrada.
+
+\section{Corrección de credenciales PostgreSQL}
+La configuración previa forzaba \code{solar:solar} dentro del backend de Compose. Un volumen creado con otra contraseña podía aparecer saludable por pg\_isready, pero la migración fallaba con \code{InvalidPasswordError}. Se corrigió el despliegue para conservar la URL original y adaptar únicamente host y puerto a \code{timescaledb:5432} dentro del contenedor.
+
+El módulo \code{src.core.docker_database} utiliza el parser de URL de SQLAlchemy, conserva credenciales codificadas, base y parámetros, y evita imprimir la URL en errores. El entrypoint exporta el resultado antes de la migración o la app. \code{POSTGRES_PASSWORD} inicializa volúmenes nuevos; editarlo no cambia la contraseña de un rol existente. La corrección de configuración no rota credenciales ni modifica registros de negocio.\cite{dbfix}
+
+\section{Salud y diagnóstico}
+\code{/health} comprueba vivacidad de API/base; \code{/ready} agrega Redis, red y código de registro, además de actividad de worker y suscriptor. Un estado ready indica disponibilidad actual, no que las lecturas sean válidas ni que un lote concreto se haya liquidado.
+
+Las métricas del suscriptor incluyen persistidos, duplicados, rechazados y cola. Un máximo de hora de medición sin cambios entre dos consultas requiere compararlo con el reloj y los eventos recientes, no declarar inmediatamente detenido el simulador. Un mensaje rechazado puede ser antiguo y un contador de ventana móvil puede disminuir sin caída del proceso. El diagnóstico combina logs acotados, calidad por dispositivo, límites de intervalos y estados de lote/financiación.
+
+\section{Seguridad implementada y límites}
+Las contraseñas se almacenan con bcrypt; los JWT usan revocación de JTI en Redis y las verificaciones de wallet tienen nonce único. Las credenciales de medidor se comparan con digests y se excluyen del almacenamiento de evidencia. Los contenedores de backend operan sin root. Las firmas, nonces y génesis se registran antes de transmitir operaciones de servicio.
+
+Persisten dependencias de confianza y necesidades de endurecimiento: tokens legibles por el navegador, refresh JWT sin rotación opaca, logout limitado al token presentado, correo de recuperación no desplegado como servicio canónico, gestión de secretos y alta disponibilidad pendientes. Los brokers anónimos locales y las claves de fixtures no son apropiados para un servicio público. Las operaciones sensibles de contratos usan permisos y protecciones de reentrancia, pero no existe una auditoría externa que certifique ausencia de vulnerabilidades.\cite{security}
+
+\section{CI y reproducibilidad}
+El workflow \code{.github/workflows/verify.yml} configura instalación de dependencias, suites de contratos/backend/IoT/frontend, chequeo de ABI, stack, escenario, reinicio del worker y pruebas de navegador. Su existencia demuestra la automatización configurada, no el éxito de una ejecución remota concreta; para afirmarlo se necesitaría el registro del job correspondiente.
+
+Las dependencias se fijan con instaladores y lockfiles. La compilación y el despliegue emplean versiones distintas de herramientas de host y del nodo Docker según sus guías; no se supone que todos los ejecutables Foundry tengan la misma versión.
