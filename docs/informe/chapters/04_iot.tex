@@ -1,6 +1,6 @@
-\chapter{Infraestructura IoT y contabilidad energética}
-\section{Modelo del hogar simulado}
-La simulación utiliza un estado coordinado por hogar en \code{iot/simulator/physics.py}. Los sensores no inventan curvas independientes que puedan contradecirse: generación, carga, almacenamiento e intercambio se derivan de una misma evolución física sintética. Existen perfiles de consumidor, productor solar, prosumidor, prosumidor con batería y pequeña instalación comercial. Las capacidades instaladas determinan qué canales se publican.\cite{iot}
+\section{Infraestructura IoT y contabilidad energética}
+\subsection{Modelo del hogar simulado}
+La simulación utiliza un estado coordinado por hogar en \code{iot/simulator/physics.py}. Los sensores no inventan curvas independientes que puedan contradecirse: generación, carga, almacenamiento e intercambio se derivan de una misma evolución física sintética. Existen perfiles de consumidor, productor solar, prosumidor, prosumidor con batería y pequeña instalación comercial. Las capacidades instaladas determinan qué canales se publican \citep{iot}.
 
 El balance de potencia del bus de corriente alterna se expresa como:
 \begin{equation}
@@ -22,17 +22,17 @@ Estación meteorológica & Irradiancia y temperaturas del entorno y panel. & Con
 \bottomrule
 \end{longtable}
 
-\section{Modos, procedencia y fallos}
+\subsection{Modos de simulación y procedencia}
 El modo normal es \code{REALTIME}, velocidad uno y fallos desactivados. La publicación registrada se realiza mediante MQTT v2. Los modos deterministas o acelerados permiten auditoría y pruebas acotadas, pero no aportan evidencia de liquidación del flujo normal. El gateway gRPC v1 permanece como ruta diagnóstica, no como transporte principal del simulador gobernado.
 
-El protocolo de mensajes declara \code{source=SIMULATED}; la fuente autorizada del dispositivo en el servidor prevalece sobre lo que afirme el publicador. Cambiar una etiqueta del JSON no convierte una medición virtual en física. Los escenarios de fallo incluyen desconexión, duplicación, pérdida de paquetes, reloj desviado, reinicio de contador, datos fuera de orden y picos de exportación, utilizados en modos de ensayo.
+El protocolo de mensajes declara \code{source=SIMULATED}; la fuente autorizada del dispositivo en el servidor prevalece sobre lo que afirme el publicador. Cambiar una etiqueta del JSON no convierte una medición virtual en física. Los modos de ensayo permiten evaluar continuidad de publicación, consistencia temporal, identidad de las fuentes y comportamiento de los contadores bajo condiciones controladas.
 
-\section{Sobre de telemetría y autenticación}
+\subsection{Sobre de telemetría y autenticación}
 El tópico canónico es \code{solar/<community>/<node>/<device>/telemetry}. El sobre v2 incluye versión, identificador de mensaje, secuencia, hora de medición, hogar, dispositivo público, comunidad, nodo, fuente, modo, unidades y datos. La credencial se verifica, pero se excluye del payload persistido y de los digests de auditoría.
 
 La aceptación exige correspondencia entre tópico, identidades, dispositivo activo, autorización de medidor y membresía. Se rechazan campos desconocidos, unidades incorrectas, valores no finitos, rangos no plausibles y horas fuera de la ventana admitida. El UUID público usado en el transporte difiere del identificador interno de la fila de dispositivo.
 
-\section{Cálculo por contadores y cobertura temporal}
+\subsection{Cálculo por contadores y cobertura temporal}
 Si $C(t)$ representa energía acumulada, el incremento observado es:
 \begin{equation}
 \Delta E=C(t_1)-C(t_0), \qquad t_1>t_0.
@@ -43,7 +43,7 @@ Los intervalos habituales son de 900 segundos, alineados en UTC. La cadencia nor
 
 Una muestra inicial parcial o un periodo posterior a una desconexión puede resultar incompleto o rechazado. Esta es una exclusión contable, no una instrucción para cambiar manualmente el estado a finalizado.
 
-\section{Calidad y trazabilidad}
+\subsection{Calidad y trazabilidad}
 \begin{longtable}{L{.26\linewidth}L{.64\linewidth}}
 \caption{Interpretación de estados energéticos y de telemetría.}\\
 \toprule Estado & Significado operativo \\ \midrule\endfirsthead

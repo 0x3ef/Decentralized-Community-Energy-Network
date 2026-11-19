@@ -1,7 +1,7 @@
-\chapter{Funciones principales de los contratos}
+\apendice{Funciones principales de los contratos}
 Este anexo describe las funciones de negocio y grupos heredados relevantes. Los getters generados por mappings y variables públicas, constructores y detalles internos se consultan en el código Solidity y ABI de la revisión fijada. No se presenta esta síntesis como reemplazo de una especificación formal del contrato.
 
-\section{TimelockController}
+\subsection{TimelockController}
 \begin{longtable}{L{.37\linewidth}L{.53\linewidth}}
 \toprule Función o grupo & Uso \\ \midrule\endfirsthead
 \toprule Función o grupo & Uso \\ \midrule\endhead
@@ -13,7 +13,7 @@ Este anexo describe las funciones de negocio y grupos heredados relevantes. Los 
 Consultas y roles & Comprobar si existe, está pendiente, lista o terminada una operación; consultar, otorgar, revocar o renunciar a roles.\\
 \bottomrule
 \end{longtable}
-\section{CommunityRegistry}
+\subsection{CommunityRegistry}
 \begin{longtable}{L{.37\linewidth}L{.53\linewidth}}
 \toprule Función o grupo & Uso \\ \midrule\endfirsthead
 \toprule Función o grupo & Uso \\ \midrule\endhead
@@ -25,7 +25,7 @@ Consultas y roles & Comprobar si existe, está pendiente, lista o terminada una 
 \code{pause}, \code{unpause} & Aplicar o retirar pausa con roles correspondientes; AccessControl añade administración de permisos.\\
 \bottomrule
 \end{longtable}
-\section{SUNToken}
+\subsection{SUNToken}
 \begin{longtable}{L{.37\linewidth}L{.53\linewidth}}
 \toprule Función o grupo & Uso \\ \midrule\endfirsthead
 \toprule Función o grupo & Uso \\ \midrule\endhead
@@ -37,7 +37,7 @@ Consultas y roles & Comprobar si existe, está pendiente, lista o terminada una 
 \code{pause}, \code{unpause}, roles & Controlar pausa, permisos y soporte de interfaces; \code{_update} aplica reglas heredadas a movimientos.\\
 \bottomrule
 \end{longtable}
-\section{CommunitySettlement}
+\subsection{CommunitySettlement}
 \begin{longtable}{L{.37\linewidth}L{.53\linewidth}}
 \toprule Función o grupo & Uso \\ \midrule\endfirsthead
 \toprule Función o grupo & Uso \\ \midrule\endhead
@@ -50,7 +50,7 @@ Consultas y roles & Comprobar si existe, está pendiente, lista o terminada una 
 Validaciones internas & \code{_check} y \code{_financiallyUsed} comprueban autorización y uso económico previo.\\
 \bottomrule
 \end{longtable}
-\section{NativeSettlementVault}
+\subsection{NativeSettlementVault}
 \begin{longtable}{L{.37\linewidth}L{.53\linewidth}}
 \toprule Función o grupo & Uso \\ \midrule\endfirsthead
 \toprule Función o grupo & Uso \\ \midrule\endhead
@@ -65,40 +65,10 @@ Validaciones internas & \code{_check} y \code{_financiallyUsed} comprueban autor
 \bottomrule
 \end{longtable}
 
-\chapter{Protocolo de demostración manual}
-\section{Preparación}
-Utilizar una instalación local existente y conservar su configuración original. Importar únicamente cuentas locales de prueba a perfiles separados para gobernanza, productor y consumidor. Verificar el origen del sitio y la dirección vinculada al usuario. No mostrar archivos cifrados, contraseñas o claves durante la grabación. Las direcciones y credenciales deben obtenerse de la instalación activa; no copiar hashes o contratos de un ejemplo anterior.
-
-\begin{lstlisting}[language=bash]
-source .venv/bin/activate
-make simulate
-make doctor
-curl --max-time 30 -sS http://127.0.0.1:8000/ready
-\end{lstlisting}
-Dejar observado un intervalo completo y esperar el periodo de gracia. Confirmar exportación elegible, lote nuevo y estado CHALLENGEABLE. El productor habitual de la simulación continua es el hogar 5; los hogares 3 y 4 aportan demanda según el perfil. Los hogares 1 y 2 se reservan al escenario finito. Si se inicia de noche, no debe esperarse exportación solar por el mero paso del tiempo.
-
-\section{Recorrido observable}
-\begin{enumerate}
-\item Consultar hogar, dispositivo, fuente SIMULATED, salud, calidad y evolución del intervalo.
-\item Abrir Liquidación, fijar el identificador del lote y revisar cantidades y política.
-\item Con la cuenta autorizada de gobernanza, preparar finalización, programar en timelock, firmar, esperar disponibilidad y ejecutar. Confirmar FINALIZED.
-\item En el productor, comprobar el crédito ISSUED y su saldo SUN; no equiparar saldo histórico total con emisión del nuevo lote.
-\item Autorizar SUN al vault y depositar la cantidad necesaria. Confirmar la transacción y disponibilidad en custodia.
-\item En el consumidor de una asignación del mismo lote, depositar ETH suficiente con límite de precio válido. Confirmar antes de repetir.
-\item Observar reserva y SETTLED. Comprobar SUN recibido e ingreso del productor. Con fondos por sí solo no cierra esta etapa.
-\item En Compensación, autorizar SUN a CommunitySettlement y compensar el consumo completo habilitado. Confirmar retiro y reducción de SUN.
-\item En el productor, retirar ingresos y contrastar el estado de cuenta y la transacción. El cambio neto de wallet incluye gas.
-\item Mostrar Transacciones y Configuración y cerrar explicando alcance local y límites físicos y regulatorios.
-\end{enumerate}
-Si una operación queda pendiente, revisar la confirmación de la extensión, RPC, hash, recibo y nonce antes de reenviarla. Un cambio de red o borrado del historial de la extensión no deshace una transacción ya minada. No reconstruir Anvil para forzar confirmaciones de una grabación.
-
-\section{Criterios de aceptación del video}
-El video debe mantener trazabilidad de lote, comunidad y participantes; presentar estados confirmados, no solo solicitudes; distinguir aprobación, depósito, liquidación y retiro; y explicar que el saldo inicial de prueba no es ingreso energético. Las esperas pueden editarse, sin presentar un estado histórico como resultado nuevo. Si falta financiación o una operación falla, documentar el estado y su causa en lugar de modificar SQL.
-
-\chapter{Consultas de diagnóstico de solo lectura}
+\apendice{Consultas de seguimiento y verificación}
 Las consultas siguientes corresponden al esquema inspeccionado y no alteran registros. Deben ejecutarse contra la base correcta, sin imprimir cadenas de conexión ni secretos.
 
-\section{Recepción y calidad}
+\subsection{Recepción y calidad}
 \begin{lstlisting}[language=SQL]
 SELECT now() AS hora_bd,
        max(measured_at) AS ultima_medicion,
@@ -117,7 +87,7 @@ GROUP BY d.device_code, t.quality_status
 ORDER BY d.device_code, t.quality_status;
 \end{lstlisting}
 
-\section{Intervalos elegibles posteriores a recuperación}
+\subsection{Intervalos elegibles posteriores a recuperación}
 \begin{lstlisting}[language=SQL]
 SELECT e.id, e.interval_start, e.eligible_export_wh
 FROM energy_intervals e
@@ -132,7 +102,7 @@ ORDER BY e.interval_start DESC;
 \end{lstlisting}
 Este resultado identifica candidatos de evidencia; aún deben pasar política, lote y finalización. No es una consulta de tokens ya emitidos.
 
-\section{Estado de lotes, claims y asignaciones}
+\subsection{Estado de lotes, claims y asignaciones}
 \begin{lstlisting}[language=SQL]
 SELECT id, interval_start, status, archived
 FROM native_settlement_batches
@@ -152,30 +122,30 @@ ORDER BY b.interval_start DESC LIMIT 30;
 \end{lstlisting}
 \code{kind=0} corresponde a emisión y \code{kind=1} a retiro por consumo. Los datos SQL son proyecciones y se contrastan con recibos/eventos del despliegue activo antes de afirmar éxito económico.
 
-\chapter{Reproducción del informe y fuentes de evidencia}
-\section{Compilación}
-El proyecto LaTeX usa XeLaTeX, latexmk, Polyglossia, TikZ, fontspec, booktabs, longtable y listings. No necesita shell-escape, descarga de imágenes ni una base de datos. Las fuentes son Latin Modern incluidas habitualmente en TeX Live.
+\apendice{Reproducción del informe y fuentes de evidencia}
+\subsection{Compilación}
+El proyecto LaTeX usa XeLaTeX, latexmk, Polyglossia, TikZ, fontspec, natbib, booktabs, longtable, caption y listings. No necesita shell-escape, descarga de imágenes ni una base de datos. El cuerpo se configura a 12 puntos con Times New Roman cuando está disponible o Nimbus Roman, una tipografía compatible con Times, como alternativa. Se utilizan márgenes de 2,54 cm, interlineado doble, sangría inicial de 1,27 cm y citas de autor y año. Las tablas utilizan interlineado sencillo para favorecer su lectura.
 \begin{lstlisting}[language=bash]
 cd docs/informe
 make pdf
 # Resultado: build/informe.pdf
 \end{lstlisting}
-Como alternativa, importar la carpeta completa a Overleaf, seleccionar XeLaTeX y definir \code{informe.tex} como documento principal. La fecha y revisión del informe son explícitas; no cambian al recompilar. El PDF es un resultado generado y los archivos auxiliares se excluyen de Git.
+Como alternativa, importar la carpeta completa a Overleaf, seleccionar XeLaTeX y definir \code{informe.tex} como documento principal. La portada se personaliza en \code{datos_academicos.tex}: incluye tres autores, institución, la asignatura Tecnologías emergentes, docente y fecha. La fecha y revisión del informe son explícitas; no cambian al recompilar. El PDF es un resultado generado y los archivos auxiliares se excluyen de Git.
 
-\section{Qué se conserva en el paquete}
+\subsection{Qué se conserva en el paquete}
 \begin{itemize}
-\item Fuentes LaTeX, capítulos, referencias y Makefile de compilación.
+\item Fuentes LaTeX, apartados, referencias y Makefile de compilación.
 \item Manifiesto de revisión, tablas, cabecera Alembic, OpenAPI y campañas de prueba, sin secretos.
 \item Copia del escenario local público versionado, con procedencia y hash del archivo original.
-\item Registro de la suite seleccionada ejecutada para esta revisión documental.
+\item Resumen de la suite seleccionada ejecutada para la revisión documental.
 \end{itemize}
-El manifiesto \code{evidencia/manifest.json} distingue evidencia versionada de registros locales de trabajo que no forman parte del repositorio general. Los resúmenes de campañas anteriores no convierten esos logs en un conjunto público completo. Las observaciones manuales se identifican como comunicación aportada, sin incorporar archivos de cuentas o datos privados.
+El manifiesto \code{evidencia/manifest.json} distingue evidencia versionada de registros locales de trabajo que no forman parte del repositorio general. Los resúmenes de campañas anteriores no convierten esos logs en un conjunto público completo.
 
-\section{Glosario}
+\subsection{Glosario}
 \begin{longtable}{L{.24\linewidth}L{.66\linewidth}}
 \toprule Término & Significado en este proyecto \\ \midrule\endfirsthead
 \toprule Término & Significado en este proyecto \\ \midrule\endhead
-DePIN & Capa de infraestructura y nodos de medición; en la demostración las fuentes son simuladas.\\
+DePIN & Capa de infraestructura y nodos de medición; en la validación las fuentes son simuladas.\\
 DeFi & Reglas de activos, custodia y liquidación mediante contratos; no implica descentralización total.\\
 EVM / Anvil & Entorno de ejecución de contratos y nodo local de prueba.\\
 ERC-20 / SUN & Estándar de token fungible y crédito energético del protocolo.\\

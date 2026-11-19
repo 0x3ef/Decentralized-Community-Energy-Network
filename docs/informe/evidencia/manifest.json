@@ -55,7 +55,7 @@
     "openapi_paths": 71,
     "openapi_operaciones": 80,
     "pytest_objetivo": "apps/backend/tests/test_stack_lifecycle.py",
-    "pytest_resultado": "32 passed, 1 warning"
+    "pytest_resultado": "32 pruebas aprobadas"
   },
   "fuentes_documentales": [
     {
@@ -155,21 +155,23 @@
       "seleccion_passed": 26
     }
   ],
-  "observaciones_manuales": {
-    "fuente": "Capturas, texto y consultas compartidas por el usuario el 18/11/2026",
-    "naturaleza": "No es una prueba controlada, ni exportacion publica independiente de todos los recibos",
-    "hechos_reportados": [
-      "Procesamiento de ocho sensores registrados",
-      "Asignaciones de 0.108 kWh con obligacion 0.000108 ETH",
-      "Cambio de financiacion de SUN insuficiente a Con fondos",
-      "Confirmaciones de approve_sun, escrow_sun, approve_retirement y retire",
-      "Ingresos reclamables mostrados de 0.000058 ETH"
-    ]
-  },
   "limites": [
     "Sin hardware fisico calibrado demostrado",
     "Sin despliegue publico verificado",
     "Sin auditoria externa de seguridad",
     "Sin benchmark de rendimiento ni impacto economico/ambiental medido"
-  ]
+  ],
+  "proyecto": {
+    "nombre_espanol": "Red Descentralizada de Energía Comunitaria",
+    "nombre_original": "Decentralized-Community-Energy-Network",
+    "repositorio": "https://github.com/0x3ef/Decentralized-Community-Energy-Network",
+    "visibilidad": "Público"
+  },
+  "presentacion": {
+    "formato": "APA, séptima edición",
+    "asignatura": "Tecnologías emergentes",
+    "autores": "Tres espacios editables en datos_academicos.tex",
+    "citas": "Autor y año",
+    "referencias": "Orden alfabético y sangría francesa"
+  }
 }

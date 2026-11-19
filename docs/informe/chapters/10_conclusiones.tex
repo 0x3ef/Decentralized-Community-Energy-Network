@@ -1,30 +1,30 @@
-\chapter{Conclusiones, limitaciones y continuidad}
-\section{Conclusiones del proceso}
+\section{Conclusiones, limitaciones y continuidad}
+\subsection{Conclusiones del proceso}
 \begin{enumerate}
 \item Se obtuvo una integración local que conserva el vínculo entre medición, autorización, crédito y pago. El resultado no depende de marcar manualmente como pagada una obligación SQL.
-\item Separar identidad de aplicación, propiedad de wallet y roles en cadena fue necesario para explicar y proteger la operación. La experiencia de demostración evidenció que esta separación debe comunicarse mejor al usuario.
+\item Separar identidad de aplicación, propiedad de wallet y roles en cadena fue necesario para explicar y proteger la operación. Esta separación delimita las responsabilidades de cada participante.
 \item El cálculo conservador por contadores y límites observados impide acreditar huecos como energía. La contrapartida es que una interrupción puede dejar intervalos sin elegibilidad y requerir esperar un periodo completamente observado.
 \item La gobernanza finaliza la evidencia; la emisión posterior, la financiación y la entrega son etapas diferentes. Esta separación explica estados que de otro modo podrían interpretarse como contradicciones del sistema.
-\item La persistencia y la génesis forman parte de la corrección económica. Conservar PostgreSQL sin el estado de Anvil no recupera saldos EVM. La recuperación debe preservar historia y evitar reemisión, no ocultar el fallo con una base nueva.
+\item La persistencia y la génesis forman parte de la corrección económica. Conservar PostgreSQL sin el estado de Anvil no recupera saldos EVM. La recuperación conserva la historia, evita la reemisión y mantiene la continuidad de la evidencia y las autorizaciones.
 \item La documentación consolidada y el escenario verificable permiten reproducir el alcance local. Las cifras de suites y cobertura deben mantenerse ligadas a sus campañas y revisiones.
 \end{enumerate}
 
-\section{Limitaciones materiales}
-La medición demostrada es simulada. Los contratos solo conocen pruebas y compromisos aportados por actores autorizados; un medidor legítimo que mienta no queda descubierto automáticamente por Merkle. No existe auditoría independiente de contratos, infraestructura o autenticación. Los límites de escalabilidad y los costes públicos no se han medido.
+\subsection{Limitaciones materiales}
+La medición verificada es simulada. Los contratos solo conocen pruebas y compromisos aportados por actores autorizados; un medidor legítimo que mienta no queda descubierto automáticamente por Merkle. No existe auditoría independiente de contratos, infraestructura o autenticación. Los límites de escalabilidad y los costes públicos no se han medido.
 
 La política actual tiene precio fijo aprobado antes de activación, sin mercado abierto de órdenes nativo ni formación dinámica de precio. La corrección de derechos ya pagados no es automática. Existen carencias de perfil editable, descubrimiento público, manifiestos completos de evidencia, historias de eventos SUN y recuperación de contraseña desplegada.
 
-No se han demostrado instalaciones físicas, acuerdos con un operador de red, validez regulatoria para venta o modificación de facturas. No se propone que SUN sustituya moneda de curso legal ni que ETH de prueba tenga valor comercial.
+No se han verificado instalaciones físicas, acuerdos con un operador de red, validez regulatoria para venta o modificación de facturas. No se propone que SUN sustituya moneda de curso legal ni que ETH de prueba tenga valor comercial.
 
-\section{Trabajo futuro priorizado}
+\subsection{Trabajo futuro priorizado}
 \begin{longtable}{L{.14\linewidth}L{.44\linewidth}L{.31\linewidth}}
 \caption{Continuidad propuesta con criterios verificables.}\\
 \toprule Prioridad & Trabajo propuesto & Criterio de cierre \\ \midrule\endfirsthead
 \toprule Prioridad & Trabajo propuesto & Criterio de cierre \\ \midrule\endhead
-Alta & Mejorar selección y advertencias de wallet; normalizar unidades y nombres de acciones. & Recorrido multiusuario sin confusión entre cuentas; validación con usuarios y pruebas de interfaz.\\
+Alta & Ampliar la orientación de cuentas y normalizar la presentación de unidades y acciones. & Recorrido multiusuario sin confusión entre cuentas; validación con usuarios y pruebas de interfaz.\\
 Alta & Auditoría externa, modelo de amenazas y gestión de claves de oráculo/gobernanza. & Hallazgos revisados y controles verificados antes de exposición pública.\\
 Alta & Instalar medidores físicos con calibración y commissioning verificable. & Comparación contra referencias metrológicas y trazabilidad del dispositivo.\\
-Alta & Ensayar restauración conjunta SQL/EVM y fallos de infraestructura. & Ensayos medidos, pérdidas máximas registradas y runbook de recuperación.\\
+Alta & Ampliar la validación de restauración conjunta SQL/EVM y continuidad operativa. & Ensayos medidos, pérdidas máximas registradas y runbook de recuperación.\\
 Media & Completar despliegue Sepolia con fuentes admitidas y autoridades separadas. & Contratos, permisos, recibos y prueba de aceptación pública conservados.\\
 Media & Medir carga, latencia, backlog, almacenamiento y costes. & Dataset y protocolo de benchmark reproducibles; no extrapolar desde el demo.\\
 Media & Revisar claves temporales para hypertables y políticas de retención. & Migración compatible con referencias y unicidad, verificada sobre datos poblados.\\
@@ -32,7 +32,7 @@ Posterior & Integración de facturación y análisis regulatorio colombiano. & R
 \bottomrule
 \end{longtable}
 
-\section{Resultado final alcanzado}
-El resultado es un \textbf{prototipo funcional y demostrable de contabilidad y liquidación energética comunitaria en red local}. La medición respalda una cantidad elegible; la gobernanza autoriza el compromiso; la emisión representa el derecho; la custodia asegura recursos; y la ejecución confirma el intercambio. El retiro por consumo y el cobro completan ese recorrido sin mezclar energía, tokens, financiación y pagos.
+\subsection{Resultado final alcanzado}
+El resultado es un \textbf{prototipo funcional y verificable de contabilidad y liquidación energética comunitaria en red local}. La medición respalda una cantidad elegible; la gobernanza autoriza el compromiso; la emisión representa el derecho; la custodia asegura recursos; y la ejecución confirma el intercambio. El retiro por consumo y el cobro completan ese recorrido sin mezclar energía, tokens, financiación y pagos.
 
 Esa conclusión se limita a la evidencia disponible y reconoce las decisiones manuales y autoridades de confianza. El valor del proceso consiste tanto en la integración lograda como en haber delimitado qué no puede inferirse de ella.

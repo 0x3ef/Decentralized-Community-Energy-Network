@@ -1,10 +1,10 @@
-\chapter{Modelo de datos e integridad}
-\section{Fuente del esquema y estado revisado}
-SQLModel y Alembic son la fuente operativa del esquema. Durante esta revisión se registraron \textbf{44 tablas} y se comprobó la cabecera \code{20261112_local_recovery}. Los archivos SQL históricos y el snapshot OpenAPI v2 no se utilizan para instalar una estructura paralela. Las cifras se refieren a tablas registradas por el código inspeccionado, no a una certificación de que cualquier base del usuario esté migrada correctamente.\cite{database,models,migration}
+\section{Modelo de datos e integridad}
+\subsection{Fuente del esquema y estado revisado}
+SQLModel y Alembic son la fuente operativa del esquema. Durante esta revisión se registraron \textbf{44 tablas} y se comprobó la cabecera \code{20261112_local_recovery}. Los archivos SQL históricos y el snapshot OpenAPI v2 no se utilizan para instalar una estructura paralela. Las cifras se refieren a tablas registradas por el código inspeccionado, no a una certificación de que cualquier base del usuario esté migrada correctamente \citep{database,models,migration}.
 
 La imagen Docker incluye TimescaleDB, pero las migraciones vigentes no crean hypertables ni retención automática. Por tanto, se documenta una persistencia PostgreSQL relacional con posibilidad futura de diseño temporal, sin atribuirle particionamiento no implementado.
 
-\section{Dominios principales}
+\subsection{Dominios principales}
 \begin{longtable}{L{.25\linewidth}L{.65\linewidth}}
 \caption{Agrupación de las tablas vigentes.}\label{tab:dominios}\\
 \toprule Dominio & Tablas y relaciones destacadas \\ \midrule\endfirsthead
@@ -22,6 +22,8 @@ Historia retenida & Tablas de órdenes, trades, redenciones, despliegues ERC-20 
 \end{longtable}
 
 \begin{figure}[htbp]
+\caption{Relaciones principales del modelo de datos}\label{fig:datos}
+
 \centering
 \begin{tikzpicture}[node distance=.85cm and 1.05cm,box/.append style={text width=3.7cm}]
 \node[box] (u) {Usuario\\\code{users.uid}};
@@ -45,22 +47,23 @@ Historia retenida & Tablas de órdenes, trades, redenciones, despliegues ERC-20 
 \draw[arr] (b)--(a);
 \draw[arr] (i.south) to[out=-120,in=-70] (a.south);
 \end{tikzpicture}
-\caption{Relaciones selectivas. Las flechas de evidencia indican trazabilidad lógica; no todas corresponden a una FK directa.}\label{fig:datos}
+\par\noindent\small\textit{Nota.} Elaboración propia a partir de los modelos SQLModel. Las flechas de evidencia indican trazabilidad lógica; no todas corresponden a una clave foránea directa \citep{models}.
+
 \end{figure}
 
-\section{Tipos y restricciones}
+\subsection{Tipos y restricciones}
 La energía se representa en Wh enteros. Las obligaciones y precios nativos utilizan \code{NUMERIC(78,0)} para conservar precisión de enteros compatibles con uint256. En la API se transmiten como cadenas decimales. SUN utiliza 18 decimales y los tiempos de cálculo y eventos son conscientes de zona horaria.
 
 Se aplican restricciones de unicidad para correo y dirección de wallet, secuencia y mensaje por dispositivo, intervalo por hogar, crédito por intervalo, lote por comunidad y periodo, claim por lote/tipo/nodo y operación firmada por outbox. Los eventos indexados incluyen identidad de bloque para conservar versiones huérfanas sin tratarlas como canónicas.
 
 Los bloqueos y las transacciones complementan estas restricciones. Una comprobación previa en Python no evita por sí sola que dos trabajadores concurrentes firmen la misma obligación. El ledger comunitario añade un trigger que rechaza actualización y borrado; un administrador de base de datos sigue teniendo capacidades superiores de mantenimiento, por lo que no se afirma inviolabilidad.
 
-\section{Separación entre evidencia y proyección}
+\subsection{Separación entre evidencia y proyección}
 La base conserva la telemetría, su calidad y las referencias de cálculo. En cambio, saldos, entregas y retiros confirmados tienen autoridad en los contratos. Las tablas nativas contienen proyecciones que deben actualizarse desde recibos y eventos canónicos. Insertar una fila \code{ISSUED} o \code{CONFIRMED} sin transacción no constituiría emisión ni pago.
 
 Las hojas y pruebas Merkle se conservan junto con las cantidades, nodo, medidor, beneficiario y política. No deben regenerarse silenciosamente a partir de estado mutable después de aprobar un lote.
 
-\section{Semillas y recuperación}
+\subsection{Semillas y recuperación}
 El seed SQLModel crea cinco hogares y quince dispositivos de ejemplo y respeta identidades, contraseñas y revocaciones existentes. El bootstrap gobernado es una fase diferente: despliega contratos y autoriza participantes mediante transacciones reales locales.
 
 La migración de recuperación añade \code{archived}, origen de génesis y un registro \code{local_chain_recoveries}; no elimina la historia. La nueva marca \code{accounting_start} impide volver a emitir desde intervalos anteriores al reemplazo de cadena. Un registro archivado en \code{RECONCILIATION_REQUIRED} conserva evidencia de una cadena perdida: no es una promesa de que esperar restaurará sus fondos.

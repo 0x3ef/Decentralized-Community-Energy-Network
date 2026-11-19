@@ -1,91 +1,93 @@
-% Compilar desde docs/informe con: make pdf
-% Fuente autocontenida; no requiere shell-escape ni recursos de red.
-\documentclass[11pt,a4paper,oneside]{report}
+% Formato de trabajo academico APA 7. Compilar con XeLaTeX: make pdf
+\documentclass[12pt,letterpaper]{article}
 \usepackage{fontspec}
-\setmainfont{Latin Modern Roman}
+% Nimbus Roman es una tipografia compatible con Times; disponible en TeX Live.
+\IfFontExistsTF{Times New Roman}{\setmainfont{Times New Roman}}{%
+  \IfFileExists{/usr/share/fonts/opentype/urw-base35/NimbusRoman-Regular.otf}{%
+    \setmainfont{NimbusRoman}[Path=/usr/share/fonts/opentype/urw-base35/,
+      Extension=.otf,UprightFont=*-Regular,BoldFont=*-Bold,
+      ItalicFont=*-Italic,BoldItalicFont=*-BoldItalic]
+  }{\setmainfont{TeX Gyre Termes}}%
+}
 \setsansfont{Latin Modern Sans}
-\setmonofont[Scale=0.88]{Latin Modern Mono Light}
+\setmonofont[Scale=0.84]{Latin Modern Mono Light}
 \usepackage{polyglossia}
 \setdefaultlanguage{spanish}
-\usepackage[margin=2.4cm,headheight=15pt]{geometry}
+\usepackage[margin=2.54cm,headheight=16pt,headsep=12pt]{geometry}
+\usepackage{setspace,indentfirst}
+\doublespacing
 \usepackage{amsmath,amssymb,booktabs,longtable,tabularx,array,ragged2e}
 \usepackage{graphicx,xcolor,tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc}
-\usepackage{enumitem,fancyhdr,titlesec,listings,xurl}
-\definecolor{verde}{HTML}{13795B}
-\definecolor{tinta}{HTML}{172C26}
-\definecolor{gris}{HTML}{60726A}
-\definecolor{fondo}{HTML}{F1F5F2}
-\usepackage[unicode,colorlinks=true,linkcolor=verde,citecolor=verde,urlcolor=verde]{hyperref}
-\hypersetup{pdftitle={Solar Energy Market: proceso de desarrollo y resultados},pdfauthor={Solar Energy Market},pdfsubject={Informe técnico de un prototipo IoT, contabilidad energética y liquidación EVM}}
+\usepackage{enumitem,fancyhdr,titlesec,listings,xurl,etoolbox,caption}
+\usepackage[authoryear,round,sort]{natbib}
+\usepackage[unicode,hidelinks]{hyperref}
+\hypersetup{pdftitle={Red Descentralizada de Energía Comunitaria: proceso de desarrollo y resultados alcanzados},pdfsubject={Informe académico en español, formato APA 7, Tecnologías emergentes}}
+\input{datos_academicos}
+\newcommand{\TituloInforme}{Red Descentralizada de Energía Comunitaria: proceso de desarrollo y resultados alcanzados}
 \newcommand{\revision}{acb2d3192b890e331958c9a6abee155a26747b76}
 \newcommand{\corte}{18 de noviembre de 2026}
 \newcommand{\code}[1]{{\small\nolinkurl{#1}}}
 \newcommand{\repo}[1]{\href{https://github.com/0x3ef/Decentralized-Community-Energy-Network/blob/acb2d3192b890e331958c9a6abee155a26747b76/#1}{\nolinkurl{#1}}}
 \newcolumntype{L}[1]{>{\RaggedRight\arraybackslash}p{#1}}
 \newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
-\setlength{\parskip}{5pt}
-\setlength{\parindent}{0pt}
+\urlstyle{same}
+\setlength{\parskip}{0pt}
 \sloppy
 \setlength{\emergencystretch}{3em}
-\renewcommand{\arraystretch}{1.18}
-\setlist[itemize]{topsep=3pt,itemsep=2pt,leftmargin=*}
-\setlist[enumerate]{topsep=3pt,itemsep=3pt,leftmargin=*}
-\titleformat{\chapter}[display]{\sffamily\bfseries\color{tinta}\RaggedRight}{\large\color{verde}Capítulo \thechapter}{6pt}{\Huge}
-\titlespacing*{\chapter}{0pt}{-15pt}{22pt}
-\titleformat{\section}{\sffamily\Large\bfseries\color{verde}}{\thesection}{.65em}{}
-\titleformat{\subsection}{\sffamily\large\bfseries}{\thesubsection}{.65em}{}
+\setlist[itemize]{topsep=0pt,itemsep=0pt,leftmargin=1.27cm}
+\setlist[enumerate]{topsep=0pt,itemsep=0pt,leftmargin=1.27cm}
+\setcounter{secnumdepth}{0}
+% Encabezados APA: nivel 1 centrado y en negrita; nivel 2 a la izquierda;
+% nivel 3 a la izquierda en negrita cursiva. Sin colores ni numeracion.
+\titleformat{\section}{\normalfont\normalsize\bfseries\centering}{}{0pt}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries\raggedright}{}{0pt}{}
+\titleformat{\subsubsection}{\normalfont\normalsize\bfseries\itshape\raggedright}{}{0pt}{}
+\titlespacing*{\section}{0pt}{\baselineskip}{0pt}
+\titlespacing*{\subsection}{0pt}{\baselineskip}{0pt}
+\titlespacing*{\subsubsection}{0pt}{\baselineskip}{0pt}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small\sffamily Solar Energy Market}
-\fancyhead[R]{\small\sffamily Proceso y resultados}
-\fancyfoot[L]{\footnotesize Corte documental: \corte}
-\fancyfoot[R]{\thepage}
-\renewcommand{\headrulewidth}{.3pt}
-\lstset{basicstyle=\ttfamily\footnotesize,backgroundcolor=\color{fondo},frame=single,rulecolor=\color{fondo},breaklines=true,columns=fullflexible,keepspaces=true,showstringspaces=false,tabsize=2}
-\tikzset{box/.style={draw=verde!55,rounded corners=3pt,fill=fondo,align=center,font=\small,minimum height=1cm,text width=3.05cm},arr/.style={-{Latex[length=2mm]},thick,draw=verde},labelnode/.style={font=\scriptsize,color=gris,align=center}}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyhead[R]{\thepage}\renewcommand{\headrulewidth}{0pt}}
+\setlength{\bibhang}{1.27cm}
+\setlength{\bibsep}{0pt}
+\renewcommand{\bibfont}{\normalfont\normalsize}
+\renewcommand{\bibsection}{\section*{Referencias}}
+\captionsetup{font=normalsize,labelfont=bf,textfont=it,labelsep=newline,justification=raggedright,singlelinecheck=false,position=above,skip=6pt}
+\captionsetup[longtable]{width=\linewidth}
+\BeforeBeginEnvironment{longtable}{\begingroup\singlespacing\small\setlength{\parindent}{0pt}}
+\AfterEndEnvironment{longtable}{\endgroup}
+\renewcommand{\arraystretch}{1.15}
+\lstset{basicstyle=\ttfamily\footnotesize,frame=none,breaklines=true,columns=fullflexible,keepspaces=true,showstringspaces=false,tabsize=2}
+\tikzset{box/.style={draw=black,rectangle,fill=white,align=center,font=\small,minimum height=1cm,text width=3.05cm},arr/.style={-{Latex[length=2mm]},semithick,draw=black},labelnode/.style={font=\scriptsize,align=center}}
+\newcommand{\apendice}[1]{\clearpage\refstepcounter{section}\setcounter{table}{0}\renewcommand{\thetable}{\Alph{section}\arabic{table}}\renewcommand{\theHtable}{\Alph{section}.\arabic{table}}\section*{\texorpdfstring{Apéndice \Alph{section}\\#1}{Apéndice \Alph{section}: #1}}}
 \begin{document}
-\hypersetup{pageanchor=false}
-\begin{titlepage}
-\color{tinta}
-{\sffamily\large COMUNIDAD · ENERGÍA · EVIDENCIA\par}
-\vspace{2cm}
-{\sffamily\bfseries\Huge Solar Energy Market\par}
-\vspace{.65cm}
-{\sffamily\LARGE Informe del proceso de desarrollo\\y de los resultados alcanzados\par}
-\vspace{1.1cm}
-{\large Prototipo de contabilidad y compensación energética comunitaria mediante IoT, SQLModel y contratos inteligentes\par}
-\vspace{1.5cm}
-\rule{\textwidth}{.8pt}
-\vspace{.3cm}
-\textbf{Alcance:} implementación y demostración local con SUN y ETH nativo de prueba.\\[.25cm]
-\textbf{Fecha de corte:} \corte.\\[.25cm]
-\textbf{Revisión técnica:} \code{acb2d31}.\\[.25cm]
-\textbf{Repositorio:} \href{https://github.com/0x3ef/Decentralized-Community-Energy-Network}{Decentralized-Community-Energy-Network}.
-\vfill
-\textbf{Naturaleza del resultado}\par
-Se documenta un prototipo funcional en Anvil con mediciones simuladas. No se afirma operación comercial, entrega física individual de electricidad, modificación de facturas, despliegue público verificado ni auditoría de seguridad independiente.
-\end{titlepage}
-\pagenumbering{roman}
-\hypersetup{pageanchor=true}
-\chapter*{Resumen ejecutivo}
-\addcontentsline{toc}{chapter}{Resumen ejecutivo}
-El proyecto desarrolló una plataforma que conecta mediciones de hogares, validación de evidencia energética y liquidación mediante contratos inteligentes. Su propósito es distinguir tres hechos que suelen confundirse: energía observada, derechos aprobados y transferencias económicas confirmadas. El prototipo permite registrar hogares y dispositivos, gestionar comunidades y membresías, calcular intervalos, asignar exportación elegible a demanda y demostrar el intercambio de créditos SUN por ETH de prueba.
-
-La solución utiliza un frontend en React y TypeScript; una API FastAPI con SQLModel, SQLAlchemy y Alembic; PostgreSQL; un broker MQTT Mosquitto; un suscriptor de telemetría; un trabajador de contabilidad y liquidación; Redis y cinco contratos EVM. La fuente normal del demostrador es un simulador coordinado de hogares que publica mensajes identificados como \code{SIMULATED}. Los contratos activos son TimelockController, CommunityRegistry, SUNToken, CommunitySettlement y NativeSettlementVault.
-
-El resultado financiero verificable se conserva en un escenario local: 5 kWh de inyección elegible, 3 kWh asignados, emisión de 5 SUN, entrega y retiro por consumo de 3 SUN, pago y retiro de 0,003 ETH del productor y 0,007 ETH remanentes del depósito del consumidor. La oferta restante es de 2 SUN. Las cantidades describen una ejecución en Anvil; no son ingresos reales ni evidencia de un intercambio físico entre dos viviendas.
-
-El proceso incluyó correcciones de reconexión MQTT, sincronización de límites de intervalos, vinculación de identidades, control de permisos, conciliación de transacciones, persistencia de Anvil y recuperación sin eliminar registros de PostgreSQL. La revisión más reciente corrigió la sobrescritura de credenciales de base de datos en Docker. En esta elaboración se verificaron 44 tablas SQLModel, la cabecera Alembic \code{20261112_local_recovery}, 71 rutas de OpenAPI con 80 operaciones HTTP y 32 pruebas de ciclo de vida aprobadas. Estas comprobaciones no equivalen a una nueva ejecución de todas las suites.
-
-El alcance logrado es una integración local demostrable. Permanecen pendientes la calibración de medidores físicos, el despliegue público verificable, una auditoría externa, el endurecimiento operativo y la integración regulatoria y de facturación. El informe conserva explícitamente esta diferencia entre implementación, evidencia disponible y trabajo futuro.
-
-\textbf{Palabras clave:} comunidad energética, IoT, telemetría, SQLModel, SUN, ERC-20, EVM, gobernanza, custodia, conciliación.
-\tableofcontents
-\listoffigures
-\listoftables
+\raggedright
+\setlength{\parindent}{1.27cm}
+\renewcommand{\tablename}{Tabla}
+% Portada academica: numero de pagina; titulo, tres autores y datos del curso.
+\thispagestyle{fancy}
+\vspace*{1.8cm}
+\begin{center}
+\textbf{\TituloInforme}\par
+\vspace{\baselineskip}
+\AutorUno\\
+\AutorDos\\
+\AutorTres\\
+\InstitucionAcademica\\
+\AsignaturaInforme\\
+\DocenteInforme\\
+\FechaEntrega
+\end{center}
 \clearpage
-\pagenumbering{arabic}
+\section*{Resumen}
+\noindent La Red Descentralizada de Energía Comunitaria integra mediciones de hogares, validación de evidencia y liquidación mediante contratos inteligentes. El proyecto está disponible en un repositorio público de GitHub y utiliza una interfaz en React, una API FastAPI con SQLModel, PostgreSQL, mensajería MQTT, procesos de trabajo y cinco contratos EVM. Este informe describe el proceso de desarrollo, la arquitectura, las funcionalidades y los resultados de la validación local. Las mediciones simuladas se procesan en intervalos y se vinculan con lotes aprobados por gobernanza. La emisión de créditos SUN y la liquidación con ETH de prueba se realizan bajo reglas de autorización, custodia y trazabilidad. El escenario financiero conservado registra 5 kWh de inyección elegible, 3 kWh asignados, emisión de 5 SUN, entrega y retiro por consumo de 3 SUN, pago de 0,003 ETH al productor y 0,007 ETH disponibles para el consumidor. La revisión estructural identifica 44 tablas SQLModel, 71 rutas OpenAPI y 80 operaciones HTTP; una selección de 32 pruebas de ciclo de vida se aprobó durante la elaboración. Los resultados permiten caracterizar un prototipo funcional en Anvil. La incorporación de medidores físicos calibrados, la validación pública y la auditoría independiente constituyen líneas de continuidad.
+\par\noindent\textit{Palabras clave:} comunidad energética, IoT, blockchain, SUN, gobernanza, liquidación.
+\clearpage
+\begin{center}\textbf{\TituloInforme}\end{center}
 \input{chapters/01_contexto}
 \input{chapters/02_proceso}
 \input{chapters/03_arquitectura}
@@ -96,7 +98,8 @@ El alcance logrado es una integración local demostrable. Permanecen pendientes 
 \input{chapters/08_operacion}
 \input{chapters/09_resultados}
 \input{chapters/10_conclusiones}
+\clearpage
+\input{referencias}
 \appendix
 \input{chapters/11_anexos}
-\input{referencias}
 \end{document}

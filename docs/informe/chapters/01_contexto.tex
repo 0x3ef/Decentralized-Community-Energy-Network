@@ -1,13 +1,16 @@
-\chapter{Contexto, problema y alcance}
-\section{Problema abordado}
+\section{Contexto, problema y alcance}
+\subsection{Contexto del proyecto}
+El proyecto se denomina \textbf{Red Descentralizada de Energía Comunitaria}. Su nombre original es \code{Decentralized-Community-Energy-Network} y su código se aloja en el repositorio público \href{https://github.com/0x3ef/Decentralized-Community-Energy-Network}{github.com/0x3ef/Decentralized-Community-Energy-Network}. El informe está redactado en español y utiliza ese nombre traducido en sus títulos y desarrollo \citep{software}.
+
+\subsection{Problema abordado}
 Una comunidad puede reunir hogares con excedentes de generación y hogares con demanda en el mismo periodo. Para reconocer un intercambio no basta con mostrar una curva de producción: es necesario determinar quién midió, qué dispositivo estaba autorizado, qué energía se exportó efectivamente, cómo se distribuye esa cantidad y si la obligación económica se pagó. La falta de trazabilidad entre estas etapas puede producir créditos duplicados, pagos sin respaldo o interpretaciones erróneas de los saldos.
 
-El proyecto aborda este problema como una cuestión de \textbf{contabilidad, evidencia y liquidación}. No se implementa un control de flujo eléctrico ni una tarifa oficial. La electricidad circula por la infraestructura física; la aplicación asigna cantidades contables de una comunidad y registra derechos y pagos bajo una política aprobada. No se aportan estudios de mercado ni mediciones de ahorro doméstico: no corresponde inferirlos de la ejecución del software.\cite{readme,settlement}
+El proyecto aborda este problema como una cuestión de \textbf{contabilidad, evidencia y liquidación}. No se implementa un control de flujo eléctrico ni una tarifa oficial. La electricidad circula por la infraestructura física; la aplicación asigna cantidades contables de una comunidad y registra derechos y pagos bajo una política aprobada. No se aportan estudios de mercado ni mediciones de ahorro doméstico: no corresponde inferirlos de la ejecución del software \citep{readme,settlement}.
 
-\section{Objetivo general}
+\subsection{Objetivo general}
 Desarrollar y verificar un prototipo que vincule telemetría autenticada de hogares con intervalos energéticos, créditos SUN y liquidaciones respaldadas por activos, preservando la trazabilidad de la evidencia y la autorización de los participantes.
 
-\section{Objetivos específicos y criterios de aceptación}
+\subsection{Objetivos específicos y criterios de aceptación}
 \begin{longtable}{L{.25\linewidth}L{.65\linewidth}}
 \caption{Objetivos y criterios observables de cumplimiento.}\label{tab:objetivos}\\
 \toprule Objetivo & Criterio de aceptación \\ \midrule\endfirsthead
@@ -19,11 +22,11 @@ Emitir créditos & Emitir una sola vez las reclamaciones válidas de lotes final
 Liquidar con respaldo & Reservar ETH y SUN y ejecutar la entrega y reconocimiento del ingreso de forma atómica.\\
 Permitir salidas & Retirar fondos disponibles e ingresos; registrar retiro de SUN por consumo entregado sin un segundo pago.\\
 Conservar historia & Reintentar operaciones sin duplicación y retener los registros SQL al reemplazar una cadena local perdida.\\
-Hacer demostrable el flujo & Proporcionar interfaz en español, escenario reproducible y evidencias de transacciones y estados.\\
+Verificar el flujo completo & Proporcionar interfaz en español, escenario de validación reproducible y evidencias de transacciones y estados.\\
 \bottomrule
 \end{longtable}
 
-\section{Actores y responsabilidades}
+\subsection{Actores y responsabilidades}
 \textbf{Productor.} Aporta exportación elegible, recibe SUN tras la aprobación, autoriza su uso, los deposita en custodia y retira ingresos cuando se liquidan asignaciones.
 
 \textbf{Consumidor.} Aporta demanda elegible, deposita ETH con una autorización de precio máximo, recibe SUN y puede retirarlos de circulación contra su consumo aprobado y entregado.
@@ -32,21 +35,20 @@ Hacer demostrable el flujo & Proporcionar interfaz en español, escenario reprod
 
 \textbf{Oráculo y trabajador.} Calculan y presentan compromisos de evidencia y tramitan operaciones autorizadas. No pueden firmar retiros de usuarios ni sustituir la decisión de gobernanza.
 
-\textbf{Gobernanza.} Controla la activación y las autorizaciones del protocolo y decide sobre los lotes a través de los roles correspondientes. El demostrador utiliza una autoridad local; no se implementa una DAO abierta con votación universal.\cite{blockchain,security}
+\textbf{Gobernanza.} Controla la activación y las autorizaciones del protocolo y decide sobre los lotes a través de los roles correspondientes. El entorno de validación utiliza una autoridad local; no se implementa una DAO abierta con votación universal \citep{blockchain,security}.
 
-\section{Delimitación del producto}
+\subsection{Delimitación del producto}
 El protocolo actual utiliza SUN y ETH nativo de prueba. Los componentes históricos de marketplace, USDx/COPx o redenciones no se consideran parte del flujo activo. Un token SUN equivale contablemente a un kWh elegible aprobado; esto no garantiza un precio de mercado, un pago en moneda fiduciaria ni una rentabilidad.
 
-El demostrador utiliza Anvil 31337 y fuentes simuladas explícitas. Existe tooling para Sepolia, pero no se aporta un despliegue público validado. La simulación solo se admite como evidencia liquidable en comunidades locales que han consentido su uso. No se afirma instalación de hardware calibrado, integración con facturas, autorización comercial de intercambio eléctrico, análisis de carga de red o producción de resultados ambientales medidos.
+El entorno de validación utiliza Anvil 31337 y fuentes simuladas explícitas. Existe tooling para Sepolia, pero no se aporta un despliegue público validado. La simulación solo se admite como evidencia liquidable en comunidades locales que han consentido su uso. No se afirma instalación de hardware calibrado, integración con facturas, autorización comercial de intercambio eléctrico, análisis de carga de red o producción de resultados ambientales medidos.
 
-\section{Método de elaboración y jerarquía de evidencia}
-Este informe resulta de revisión documental y contraste con el repositorio en la revisión \code{acb2d31}; no es una nueva campaña de campo. Se utilizaron las guías canónicas de arquitectura, API, base de datos, IoT, contratos, despliegue, configuración, seguridad y verificación, junto con modelos, migraciones, contratos y scripts.\cite{architecture,database,iot,verification}
+\subsection{Método de elaboración y jerarquía de evidencia}
+Este informe resulta de revisión documental y contraste con el repositorio en la revisión \code{acb2d31}; no es una nueva campaña de campo. Se utilizaron las guías canónicas de arquitectura, API, base de datos, IoT, contratos, despliegue, configuración, seguridad y verificación, junto con modelos, migraciones, contratos y scripts \citep{architecture,database,iot,verification}.
 
-Se distinguen cuatro clases de evidencia:
+Se distinguen tres clases de evidencia:
 \begin{enumerate}
 \item \textbf{Código y esquema inspeccionados:} sustentan qué mecanismos están implementados, sin probar por sí solos toda su ejecución.
 \item \textbf{Artefacto de ejecución versionado:} el JSON público del escenario local permite comprobar cantidades, identificadores y resultados retenidos.
 \item \textbf{Registros locales de pruebas anteriores:} respaldan ejecuciones concretas y se resumen con su alcance; no se presentan como resultados nuevos ni como archivos disponibles en cualquier clon.
-\item \textbf{Observaciones manuales compartidas durante la demostración:} ilustran errores y comportamientos reales reportados, pero no sustituyen una prueba controlada ni una auditoría independiente.
 \end{enumerate}
-Durante esta elaboración se ejecutaron únicamente comprobaciones documentales y de estructura, más la suite de ciclo de vida indicada en el capítulo de resultados. No se reinicializó la base de datos, no se reemplazó Anvil y no se emitieron nuevas transacciones para redactar el informe.
+Durante esta elaboración se ejecutaron únicamente comprobaciones documentales y de estructura, más la suite de ciclo de vida indicada en el apartado de resultados. No se reinicializó la base de datos, no se reemplazó Anvil y no se emitieron nuevas transacciones para redactar el informe.

@@ -1,11 +1,23 @@
-INFORME TECNICO — SOLAR ENERGY MARKET
+RED DESCENTRALIZADA DE ENERGIA COMUNITARIA — INFORME APA 7
 
-Contenido
-- informe.tex: documento principal y portada.
-- chapters/: capitulos y anexos.
-- referencias.tex: fuentes con enlaces a la revision tecnica revisada.
-- evidencia/: manifiesto, escenario publico y verificacion seleccionada.
-- Makefile: compilacion local con XeLaTeX y latexmk.
+Proyecto original: Decentralized-Community-Energy-Network
+Repositorio publico:
+https://github.com/0x3ef/Decentralized-Community-Energy-Network
+
+Portada
+Editar datos_academicos.tex. Hay tres espacios para los integrantes.
+La asignatura ya esta definida como Tecnologias emergentes.
+Completar la institucion, el docente y la fecha que corresponda.
+
+Formato academico
+Tamano carta; margenes de 2,54 cm; fuente Times New Roman, o Nimbus Roman
+compatible con Times si no esta instalada; cuerpo de 12 puntos; interlineado
+doble; sangria de 1,27 cm; alineacion izquierda; numero superior derecho.
+Encabezados sin numeracion. Resumen en un parrafo y palabras clave.
+Citas de autor y ano; referencias alfabeticas con sangria francesa.
+Numero y titulo de tablas/figuras encima del elemento. Las tablas y los
+bloques de codigo usan espaciado adaptado para conservar legibilidad.
+No se incluyen indice general, listas de tablas ni cabeceras comerciales.
 
 Compilar desde esta carpeta:
     make pdf
@@ -13,23 +25,10 @@ Resultado:
     build/informe.pdf
 
 Overleaf
-1. Crear un proyecto cargando el ZIP de las fuentes.
-2. Seleccionar informe.tex como documento principal.
-3. En las opciones del proyecto seleccionar XeLaTeX.
-4. Recompilar. No se requiere shell-escape ni una base de datos.
+Importar el ZIP, seleccionar informe.tex y usar el compilador XeLaTeX.
+No se requieren shell-escape, conexion a una base de datos ni claves.
 
-Personalizacion
-La portada no inventa autor, universidad, programa o tutor. Se pueden agregar
-esos datos en el bloque titlepage de informe.tex. El corte documental y la
-revision tecnica son explicitos y no cambian al recompilar.
-
-Alcance
-Este es un informe retrospectivo, no una guia operativa alternativa. Las guias
-canonicas del repositorio siguen siendo la referencia para instalar y operar.
-Las pruebas completas anteriores se distinguen de las 32 pruebas seleccionadas
-que se ejecutaron durante la elaboracion. No se realizaron nuevos pagos ni se
-modificaron datos SQL para escribir el informe.
-
-Confidencialidad
-El paquete no contiene archivos .env, contrasenas, claves privadas ni keystores.
-Los identificadores de transacciones del escenario corresponden a Anvil local.
+Contenido
+Fuentes, capitulos, referencias, datos editables de portada y evidencia publica.
+El informe describe el proceso, arquitectura, funcionalidades y resultados.
+Las guias operativas del repositorio mantienen su funcion de referencia.

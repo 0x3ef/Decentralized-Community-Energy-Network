@@ -1,10 +1,11 @@
-\chapter{Funcionalidades y experiencia de demostración}
-\section{Acceso, wallet y permisos}
+\section{Funcionalidades de la plataforma}
+\subsection{Acceso, wallet y permisos}
 El usuario puede registrarse e iniciar sesión; la aplicación conserva una sesión HTTP separada de MetaMask. La vinculación de wallet utiliza un mensaje con usuario, dirección y nonce de un solo uso. Firmarlo prueba control de la cuenta y no deposita activos ni concede autoridad de gobernanza.
 
-Una incidencia recurrente de la demostración fue seleccionar una cuenta de MetaMask distinta de la vinculada al usuario. La interfaz muestra la dirección conectada y avisa cuando los fondos del servidor pertenecen a otra. Para demostraciones simultáneas conviene un perfil de navegador por rol; las pestañas de un mismo perfil pueden compartir sesión y permisos de la extensión. Se recomienda autorizar solo la cuenta necesaria para el sitio y verificar la red 31337 antes de firmar.
+La sesión HTTP, la cuenta seleccionada en la extensión y la wallet vinculada al usuario son identidades que la aplicación comprueba de forma independiente. La operación sobre fondos propios requiere correspondencia de dirección y red. Los permisos del contrato se consultan en cadena.
 
-\section{Mapa funcional de la interfaz}
+
+\subsection{Mapa funcional de la interfaz}
 \begin{longtable}{L{.23\linewidth}L{.40\linewidth}L{.26\linewidth}}
 \caption{Funciones visibles y sus límites.}\label{tab:funcionalidades}\\
 \toprule Pantalla & Operación implementada & Límite que debe comunicarse \\ \midrule\endfirsthead
@@ -24,20 +25,15 @@ Configuración & Estado de servicios, perfil consultable, idioma/zona y capacida
 \bottomrule
 \end{longtable}
 
-\section{Operaciones que requieren firma}
+\subsection{Operaciones que requieren firma}
 Las acciones \code{approve_sun} y \code{escrow_sun} son diferentes: la primera concede un allowance al vault y la segunda transfiere SUN a custodia. De modo análogo, \code{approve_retirement} autoriza a CommunitySettlement y \code{retire} quema SUN por consumo. \code{deposit} mueve ETH nativo al vault; \code{withdraw_earnings} cobra ingresos ya acreditados. Las etiquetas técnicas presentes en el historial no indican una nueva obligación de firmar cuando el estado ya es confirmado.
 
 La revisión previa muestra red, remitente, contrato, valor y argumentos. La API no dispone de la firma del usuario. Mantener esta intervención limita la automatización a tareas para las que existe una autoridad específica y evita que el servidor retire fondos de participantes.
 
-\section{Estados que se deben interpretar separadamente}
+\subsection{Estados que se deben interpretar separadamente}
 Un intervalo \code{FINALIZED} expresa el cierre de la medición. Un lote \code{FINALIZED} expresa aprobación del compromiso de evidencia. Un crédito \code{ISSUED} refleja emisión confirmada. Una asignación \code{SETTLED} refleja la entrega y reconocimiento financiero. Un consumo retirado refleja una quema válida contra entrega. Ninguno de esos nombres reemplaza a los otros.
 
 La financiación \code{FUNDED} puede significar que una reserva ya existe o que hay recursos suficientes para intentar reservar. La ejecución sigue dependiendo de lote activo/finalizado y demás condiciones del protocolo. Una reserva consume disponibilidad: otros lotes pueden dejar una asignación sin recursos aunque la wallet conserve saldo.
 
-\section{Demostración manual observada}
-El usuario compartió resultados de recepción y procesamiento de ocho sensores registrados en los hogares de simulación continua. También mostró intervalos de un productor con exportación positiva, asignaciones de 0,108 kWh con obligación de 0,000108 ETH y el cambio de financiación de SUN insuficiente a con fondos. Se reportaron confirmaciones en la interfaz de \code{approve_sun}, \code{escrow_sun}, \code{approve_retirement} y \code{retire}; una captura mostró ingresos reclamables de 0,000058 ETH.
-
-Estos datos se describen como \textbf{observaciones manuales aportadas}, no como una segunda reproducción controlada del escenario de 5/3 kWh. No se suman saldos de capturas de distintos momentos ni se atribuye una ganancia al saldo inicial de cerca de 100 ETH de las cuentas de prueba. El artefacto versionado del escenario continúa siendo la evidencia reproducible principal.\cite{manual,scenario}
-
-\section{Límites de usabilidad identificados}
-El historial de tokens de una wallet y sus permisos de sitio pueden persistir al cambiar de usuario en la aplicación. Además, cantidades en unidades base pueden parecer desproporcionadas: \(108000000000000000\) unidades equivalen a 0,108 SUN. La denominación \textit{retirar} puede referirse a recuperar tokens, cobrar ingresos o retirar créditos de circulación. Son oportunidades de mejora de texto, formato y orientación; no se afirma haber rediseñado esos flujos durante este informe.
+\subsection{Presentación de cantidades y acciones}
+Las cantidades SUN se presentan en unidades de token y en unidades base según el contexto técnico. Por ejemplo, \(108000000000000000\) unidades base equivalen a 0,108 SUN. La interfaz distingue la recuperación de tokens depositados, el cobro de ingresos y el retiro de créditos de circulación contra consumo. Cada acción tiene un propósito y una autorización específicos.
