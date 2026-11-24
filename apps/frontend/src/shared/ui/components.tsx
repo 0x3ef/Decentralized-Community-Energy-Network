@@ -10,7 +10,7 @@ import {
   type ErrorInfo,
   type FormEvent,
 } from "react";
-import { AlertTriangle, ArrowUpRight, Inbox, LoaderCircle } from "lucide-react";
+import { CircleAlert, ArrowUpRight, Inbox, LoaderCircle } from "lucide-react";
 import { statusLabel } from "./i18n";
 import { errorMessage } from "../utils/format";
 export function Page({
@@ -68,7 +68,7 @@ export function Notice({
       className={`notice ${tone}`}
       role={tone === "warning" ? "alert" : "status"}
     >
-      <AlertTriangle size={18} />
+      {tone === "warning" && <CircleAlert size={16} aria-hidden="true" />}
       <div>{children}</div>
     </div>
   );

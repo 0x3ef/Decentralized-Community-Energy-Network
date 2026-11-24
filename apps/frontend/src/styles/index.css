@@ -558,13 +558,10 @@ details code {
   display: flex;
   gap: 11px;
   align-items: flex-start;
-  border: 1px solid #d9e8e5;
-  border-radius: 9px;
-  padding: 14px 16px;
+  padding: 0;
   font-size: 12px;
   line-height: 1.7;
-  background: #edf7f4;
-  color: #27604d;
+  color: var(--muted);
   margin: 18px 0;
 }
 .notice svg {
@@ -572,13 +569,10 @@ details code {
   margin-top: 2px;
 }
 .notice.warning {
-  background: #fff7e9;
-  color: #85530d;
-  border-color: #f0dfbe;
+  color: var(--text);
 }
 .notice.success {
-  background: #ecfdf5;
-  color: #047857;
+  color: var(--green);
 }
 .field {
   display: grid;
