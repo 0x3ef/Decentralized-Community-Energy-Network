@@ -36,16 +36,20 @@ for (const [index, role] of [
     }, tokens);
     await page.goto("http://127.0.0.1:8080/");
     await expect(
-      page.getByRole("heading", { name: "Tu energía, Solar" }),
+      page.getByRole("heading", { name: "Hola, Solar" }),
     ).toBeVisible();
+    await page.getByRole("link", { name: "Cartera", exact: true }).click();
     await page
-      .getByRole("link", { name: "Depósitos y retiros", exact: true })
+      .getByText("SUN, reservas y autorizaciones", { exact: true })
       .click();
     const metrics = page.locator(".metric");
     if (role === "producer") {
       await expect(
         metrics.filter({ hasText: "Ingresos reclamables" }).locator("strong"),
       ).toHaveText("0 ETH");
+      await page
+        .getByText("Cómo funcionan los fondos", { exact: true })
+        .click();
       await expect(page.getByText("0,003 ETH", { exact: true })).toBeVisible();
       await expect(
         metrics
@@ -59,9 +63,9 @@ for (const [index, role] of [
       await page.getByRole("link", { name: "Resumen", exact: true }).click();
       await expect(
         page
-          .locator(".metric")
+          .locator(".balance-list > div")
           .filter({ hasText: "Consumo compensado" })
-          .locator("strong"),
+          .locator("dd"),
       ).toHaveText("3 kWh");
     }
     await page

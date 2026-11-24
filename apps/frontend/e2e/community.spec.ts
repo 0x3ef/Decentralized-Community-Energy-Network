@@ -24,8 +24,14 @@ test("real API: registration, login, proposal, home, sensor, monitoring and mobi
   await page.getByLabel("Contraseña").fill(password);
   await page.getByRole("button", { name: "Crear cuenta", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Tu energía, Elena" }),
+    page.getByRole("heading", { name: "Hola, Elena" }),
   ).toBeVisible();
+  if (
+    !(await page
+      .locator(".management-menu")
+      .evaluate((el) => el.hasAttribute("open")))
+  )
+    await page.locator(".management-menu > summary").click();
   await page.getByRole("link", { name: "Mi comunidad", exact: true }).click();
   await page.getByRole("button", { name: "Proponer comunidad" }).click();
   await page
@@ -56,6 +62,12 @@ test("real API: registration, login, proposal, home, sensor, monitoring and mobi
   await expect(
     page.getByRole("heading", { name: "Casa del sol" }),
   ).toBeVisible();
+  if (
+    !(await page
+      .locator(".management-menu")
+      .evaluate((el) => el.hasAttribute("open")))
+  )
+    await page.locator(".management-menu > summary").click();
   await page
     .getByRole("link", { name: "Nodos y medidores", exact: true })
     .click();
@@ -77,24 +89,26 @@ test("real API: registration, login, proposal, home, sensor, monitoring and mobi
   await expect(
     page.getByText("Sin señal reciente", { exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("link", { name: "Monitoreo energético", exact: true })
-    .click();
+  await page.getByRole("link", { name: "Energía", exact: true }).click();
   await expect(
     page
       .getByRole("heading", { name: "Aún no hay intervalos energéticos" })
       .first(),
   ).toBeVisible();
   await expect(page.locator(".metric strong").first()).toHaveText("—");
+  if (
+    !(await page
+      .locator(".management-menu")
+      .evaluate((el) => el.hasAttribute("open")))
+  )
+    await page.locator(".management-menu > summary").click();
   await page.getByRole("link", { name: "Créditos SUN", exact: true }).click();
   await expect(
     page.getByRole("heading", {
       name: "Tu primera contribución está por llegar",
     }),
   ).toBeVisible();
-  await page
-    .getByRole("link", { name: "Depósitos y retiros", exact: true })
-    .click();
+  await page.getByRole("link", { name: "Cartera", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Revisar operación" }),
   ).toBeDisabled();
@@ -102,7 +116,7 @@ test("real API: registration, login, proposal, home, sensor, monitoring and mobi
   await page.getByRole("button", { name: "Abrir menú" }).click();
   await page.getByRole("link", { name: "Resumen", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Tu energía, Elena" }),
+    page.getByRole("heading", { name: "Hola, Elena" }),
   ).toBeVisible();
   expect(
     await page.evaluate(
@@ -122,7 +136,7 @@ test("real API: registration, login, proposal, home, sensor, monitoring and mobi
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Tu energía, Elena" }),
+    page.getByRole("heading", { name: "Hola, Elena" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Cerrar sesión" }).click();
   await expect(
@@ -134,7 +148,7 @@ test("real API: registration, login, proposal, home, sensor, monitoring and mobi
     .getByRole("button", { name: "Iniciar sesión", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Tu energía, Elena" }),
+    page.getByRole("heading", { name: "Hola, Elena" }),
   ).toBeVisible();
 });
 test("real API: login failure does not create a session", async ({

@@ -10,6 +10,11 @@ import {
 } from "recharts";
 import type { EnergyIntervalReadModel } from "../../shared/api/models";
 import { Empty } from "../../shared/ui/components";
+const timeFormatter = new Intl.DateTimeFormat("es-CO", {
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "America/Bogota",
+});
 export function EnergyChart({
   intervals,
   grid = false,
@@ -25,11 +30,7 @@ export function EnergyChart({
       </Empty>
     );
   const data = intervals.map((i) => ({
-    time: new Intl.DateTimeFormat("es-CO", {
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "America/Bogota",
-    }).format(new Date(i.interval_start)),
+    time: timeFormatter.format(new Date(i.interval_start)),
     generation: i.generation_wh / 1000,
     consumption: i.consumption_wh / 1000,
     imports: i.grid_import_wh / 1000,

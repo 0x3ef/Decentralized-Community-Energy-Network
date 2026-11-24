@@ -33,35 +33,35 @@ export default function AuthPage() {
         <div className="brand">
           <Sun />
           <span>
-            solar<span className="brand-small">ENERGY MARKET</span>
+            solar<span className="brand-small">ENERGÍA COMUNITARIA</span>
           </span>
         </div>
         <div>
-          <p className="eyebrow">EL FUTURO ES COMUNITARIO</p>
+          <p className="eyebrow">RED DESCENTRALIZADA DE ENERGÍA COMUNITARIA</p>
           <h1>
-            Tu energía.
+            Produce energía.
             <br />
-            Nuestra comunidad.
+            Comparte su valor.
           </h1>
           <p>
-            Conecta tu hogar a una red de energía solar verificada, transparente
-            y compartida.
+            Consulta tus mediciones, participa en la liquidación comunitaria y
+            compensa tu consumo con SUN.
           </p>
           <div className="auth-orbit">
             <Sun size={100} />
             <span>
-              <Leaf /> Energía con propósito
+              <Leaf /> 1 SUN = 1 kWh
             </span>
           </div>
         </div>
         <p className="auth-foot">
-          <ShieldCheck size={18} /> Infraestructura real. Evidencia verificable.
+          <ShieldCheck size={18} /> Mediciones, asignaciones y pagos en una sola
+          plataforma.
         </p>
       </aside>
       <main className="auth-main">
         <div className="auth-form">
-          <span className="badge green">PLATAFORMA DePIN</span>
-          <h1>{register ? "Comienza a conectar" : "Bienvenido de nuevo"}</h1>
+          <h1>{register ? "Crear una cuenta" : "Bienvenido de nuevo"}</h1>
           <p className="description">
             {register
               ? "Crea tu cuenta para participar en una comunidad energética."

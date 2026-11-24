@@ -26,7 +26,7 @@ import {
   Hash,
   Pagination,
 } from "../../shared/ui/components";
-import { eth, kwh, date, errorMessage } from "../../shared/utils/format";
+import { eth, kwh, date, units, errorMessage } from "../../shared/utils/format";
 export function Statement() {
   const { id } = useCommunity();
   const q = useApi<ParticipantStatement>(
@@ -272,8 +272,8 @@ function Funding({ allocation }: { allocation: AllocationView }) {
               <dd>{eth(q.data.due_wei)}</dd>
               <dt>ETH disponible propio</dt>
               <dd>{eth(q.data.available_wei)}</dd>
-              <dt>SUN requeridos (unidades base)</dt>
-              <dd>{q.data.required_sun_units}</dd>
+              <dt>SUN requeridos</dt>
+              <dd>{units(q.data.required_sun_units)} SUN</dd>
               <dt>Bloque confirmado</dt>
               <dd>{q.data.confirmed_block ?? "—"}</dd>
             </dl>
@@ -386,7 +386,9 @@ export function SettlementDetail() {
                 <Notice>
                   Pendiente de aprobación de gobernanza. Una vez vencido el
                   período de revisión, la wallet autorizada puede{" "}
-                  <Link to={`/gobernanza?action=finalize_batch&batch=${batch.data.id}`}>
+                  <Link
+                    to={`/gobernanza?action=finalize_batch&batch=${batch.data.id}`}
+                  >
                     preparar la finalización del lote
                   </Link>
                   . La emisión SUN se tramita después de finalizarlo.

@@ -14,7 +14,7 @@ import { AlertTriangle, ArrowUpRight, Inbox, LoaderCircle } from "lucide-react";
 import { statusLabel } from "./i18n";
 import { errorMessage } from "../utils/format";
 export function Page({
-  eyebrow = "COMUNIDAD · ENERGÍA · CONFIANZA",
+  eyebrow,
   title,
   description,
   children,
@@ -30,7 +30,7 @@ export function Page({
     <>
       <header className="page-heading">
         <div>
-          <p className="eyebrow">{eyebrow}</p>
+          {eyebrow && <p className="eyebrow">{eyebrow}</p>}
           <h1>{title}</h1>
           <p className="description">{description}</p>
         </div>
@@ -115,7 +115,7 @@ export function Metric({
     <div className={`metric ${tone}`}>
       <span>{label}</span>
       <strong>{value}</strong>
-      <small>{hint ?? "Información confirmada por el protocolo"}</small>
+      {hint && <small>{hint}</small>}
     </div>
   );
 }

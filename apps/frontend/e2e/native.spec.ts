@@ -143,6 +143,12 @@ test("real Anvil: wrong-network guard, ETH deposit, exact review, withdrawal and
   await page.getByLabel("Importe (ETH)", { exact: true }).fill("0,001");
   await page.getByRole("button", { name: "Revisar operación" }).click();
   await sign(page);
+  if (
+    !(await page
+      .locator(".management-menu")
+      .evaluate((el) => el.hasAttribute("open")))
+  )
+    await page.locator(".management-menu > summary").click();
   await page.getByRole("link", { name: "Transacciones", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Registro del servidor" }),
@@ -158,12 +164,16 @@ test("real Anvil: verified injection, allocations, settlement and producer earni
   page,
 }) => {
   await prepare(page, fixture!.producer);
-  await page
-    .getByRole("link", { name: "Monitoreo energético", exact: true })
-    .click();
+  await page.getByRole("link", { name: "Energía", exact: true }).click();
   await expect(
     page.getByRole("cell", { name: "5 kWh", exact: true }).first(),
   ).toBeVisible();
+  if (
+    !(await page
+      .locator(".management-menu")
+      .evaluate((el) => el.hasAttribute("open")))
+  )
+    await page.locator(".management-menu > summary").click();
   await page
     .getByRole("link", { name: "Nodos y medidores", exact: true })
     .click();
@@ -171,6 +181,12 @@ test("real Anvil: verified injection, allocations, settlement and producer earni
   await expect(
     page.getByRole("heading", { name: "Evaluaciones de calidad" }),
   ).toBeVisible();
+  if (
+    !(await page
+      .locator(".management-menu")
+      .evaluate((el) => el.hasAttribute("open")))
+  )
+    await page.locator(".management-menu > summary").click();
   await page.getByRole("link", { name: "Créditos SUN", exact: true }).click();
   await expect(
     page.getByRole("cell", { name: "5 kWh", exact: true }),
@@ -189,9 +205,7 @@ test("real Anvil: verified injection, allocations, settlement and producer earni
   await expect(
     page.getByRole("cell", { name: "0,003 ETH", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("link", { name: "Depósitos y retiros", exact: true })
-    .click();
+  await page.getByRole("link", { name: "Cartera", exact: true }).click();
   await page
     .getByLabel("Operación", { exact: true })
     .selectOption("withdraw_earnings");
@@ -207,9 +221,7 @@ test("real Anvil: eligible consumption, SUN approval and confirmed retirement", 
   page,
 }) => {
   await prepare(page, fixture!.consumer);
-  await page
-    .getByRole("link", { name: "Compensación energética", exact: true })
-    .click();
+  await page.getByRole("link", { name: "Compensación", exact: true }).click();
   await page.getByLabel("Lote", { exact: true }).selectOption(fixture!.batch);
   const claims = page.getByLabel("Claim de consumo", { exact: true });
   await expect(claims).toContainText("3 kWh");
@@ -252,6 +264,7 @@ test("real Anvil: role-gated registry governance is signed and confirmed", async
   page,
 }) => {
   await prepare(page, fixture!.producer);
+  await page.locator(".management-menu > summary").click();
   await expect(
     page.getByRole("link", { name: "Gobernanza", exact: true }),
   ).toBeVisible();

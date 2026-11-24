@@ -17,7 +17,6 @@ import {
   Activity,
   Leaf,
   Layers,
-  ArrowDownUp,
   ShieldCheck,
   History,
   Settings,
@@ -62,15 +61,18 @@ const Dashboard = lazy(() => import("../features/dashboard/DashboardPage")),
   Governance = lazy(() => import("../features/governance/GovernancePage"));
 const navigation = [
   ["/", "overview", LayoutDashboard],
+  ["/energia", "energy", Activity],
+  ["/liquidacion", "settlement", Layers],
+  ["/depositos", "deposits", Wallet],
+  ["/compensacion", "compensation", Leaf],
+] as const;
+const management = [
   ["/comunidad", "community", Users],
   ["/hogares", "homes", House],
   ["/dispositivos", "devices", Radio],
-  ["/energia", "energy", Activity],
-  ["/creditos", "credits", Leaf],
-  ["/liquidacion", "settlement", Layers],
-  ["/depositos", "deposits", ArrowDownUp],
-  ["/compensacion", "compensation", ShieldCheck],
+  ["/creditos", "credits", Sun],
   ["/transacciones", "transactions", History],
+  ["/gobernanza", "governance", ShieldCheck],
 ] as const;
 function SettingsPage() {
   const { user } = useAuth();
@@ -104,17 +106,6 @@ function SettingsPage() {
           tiempos UTC al servidor.
         </p>
       </Card>
-      <Card title="Capacidades del protocolo">
-        <p>
-          Comunidades, telemetría, créditos SUN, liquidación en ETH nativo y
-          retiro contra consumo elegible.
-        </p>
-        <Notice>
-          El marketplace P2P con ETH nativo no está soportado por los contratos
-          actuales. El directorio público, el manifiesto completo de evidencia y
-          el historial SUN por evento requieren ampliar el API.
-        </Notice>
-      </Card>
     </Page>
   );
 }
@@ -143,7 +134,8 @@ function Shell() {
       }
       if (event.key === "Tab") {
         const items = Array.from(
-          asideRef.current?.querySelectorAll<HTMLElement>("a,button") ?? [],
+          asideRef.current?.querySelectorAll<HTMLElement>("a,button,summary") ??
+            [],
         ).filter((el) => el.offsetParent !== null);
         const first = items[0],
           last = items.at(-1);
@@ -192,7 +184,7 @@ function Shell() {
             <Sun size={27} />
           </div>
           <span>
-            solar<span className="brand-small">ENERGY MARKET</span>
+            solar<span className="brand-small">ENERGÍA COMUNITARIA</span>
           </span>
         </NavLink>
         <button
@@ -202,7 +194,7 @@ function Shell() {
         >
           <X />
         </button>
-        <p className="nav-label">ESPACIO COMUNITARIO</p>
+        <p className="nav-label">MI COMUNIDAD</p>
         <nav aria-label="Navegación principal">
           {navigation.map(([path, label, Icon]) => (
             <NavLink key={path} to={path} end={path === "/"}>
@@ -212,14 +204,35 @@ function Shell() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <p className="nav-label">ADMINISTRACIÓN</p>
+          <details
+            className="management-menu"
+            key={location.pathname}
+            open={
+              management.some(([path]) => location.pathname === path) ||
+              undefined
+            }
+          >
+            <summary>
+              Gestión y actividad <ChevronDown size={15} />
+            </summary>
+            <nav aria-label="Gestión y actividad">
+              {management
+                .filter(
+                  ([path]) => path !== "/gobernanza" || roles.data?.governance,
+                )
+                .map(([path, label, Icon]) => (
+                  <NavLink
+                    key={path}
+                    to={path}
+                    onClick={() => setMobile(false)}
+                  >
+                    <Icon size={18} />
+                    {t(label)}
+                  </NavLink>
+                ))}
+            </nav>
+          </details>
           <nav aria-label="Navegación secundaria">
-            {roles.data?.governance && (
-              <NavLink to="/gobernanza" onClick={() => setMobile(false)}>
-                <ShieldCheck size={18} />
-                {t("governance")}
-              </NavLink>
-            )}
             <NavLink to="/configuracion" onClick={() => setMobile(false)}>
               <Settings size={18} />
               {t("settings")}
@@ -278,6 +291,11 @@ function Shell() {
             </button>
             <button
               className="wallet-button"
+              aria-label={
+                wallet.address
+                  ? `Wallet ${short(wallet.address)}`
+                  : "Conectar wallet"
+              }
               onClick={() => void wallet.connect().catch(() => {})}
             >
               <Wallet size={16} />
@@ -344,10 +362,8 @@ function Shell() {
           </Suspense>
         </main>
         <footer className="app-footer">
-          <span>
-            Solar Energy Market · Infraestructura energética comunitaria
-          </span>
-          <span>Medir. Compartir. Verificar.</span>
+          <span>Red Descentralizada de Energía Comunitaria</span>
+          <span>Energía · SUN · ETH</span>
         </footer>
       </div>
     </div>

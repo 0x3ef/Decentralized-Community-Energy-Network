@@ -31,8 +31,8 @@ export default function DepositsPage() {
     [error, setError] = useState("");
   return (
     <Page
-      title="Depósitos y retiros"
-      description="Gestiona fondos del protocolo con una firma explícita y confirmación en cadena."
+      title="Cartera"
+      description="Deposita fondos, habilita SUN o retira tus ingresos."
     >
       <WalletPanel balances />
       <div className="two-col">
@@ -92,6 +92,17 @@ export default function DepositsPage() {
                 placeholder="0,01"
               />
             </Field>
+            <p className="operation-hint">
+              {action === "deposit"
+                ? "El consumidor deposita ETH para cubrir sus asignaciones de energía."
+                : action === "withdraw_earnings"
+                  ? "Envía los ingresos de liquidaciones a tu wallet."
+                  : action === "withdraw"
+                    ? "Retira el ETH que no está reservado para asignaciones."
+                    : action === "withdraw_sun"
+                      ? "Devuelve los SUN no reservados a tu wallet."
+                      : "El productor autoriza y deposita SUN para que se puedan liquidar sus asignaciones."}
+            </p>
             {action === "escrow_sun" && (
               <Notice>
                 Primero autoriza el importe exacto de SUN para el vault; espera
@@ -122,28 +133,31 @@ export default function DepositsPage() {
             </button>
           </Form>
         </Card>
-        <Card title="Tus fondos, con claridad">
-          <dl className="detail-list">
-            <dt>ETH en wallet</dt>
-            <dd>Permanece bajo control de tu wallet.</dd>
-            <dt>Depósito disponible</dt>
-            <dd>Fondos confirmados que el protocolo puede reservar.</dd>
-            <dt>ETH reservado</dt>
-            <dd>No se puede retirar mientras garantiza una asignación.</dd>
-            <dt>Ingresos de productor</dt>
-            <dd>ETH ganado por liquidaciones confirmadas.</dd>
-            <dt>Ingresos ya retirados</dt>
-            <dd>{eth(statement.data?.withdrawn_earnings_wei)}</dd>
-          </dl>
-          <Notice>
-            Sepolia ETH y Anvil ETH son activos de prueba sin valor monetario
-            real. El saldo de tu wallet no es tu depósito en el vault.
-          </Notice>
-          <p className="fine-print">
-            Las retiradas seguras pueden seguir disponibles aunque la comunidad
-            esté suspendida; el contrato decide si están permitidas.
-          </p>
-        </Card>
+        <details className="disclosure">
+          <summary>Cómo funcionan los fondos</summary>
+          <Card>
+            <dl className="detail-list">
+              <dt>ETH en wallet</dt>
+              <dd>Permanece bajo control de tu wallet.</dd>
+              <dt>Depósito disponible</dt>
+              <dd>Fondos confirmados que el protocolo puede reservar.</dd>
+              <dt>ETH reservado</dt>
+              <dd>No se puede retirar mientras garantiza una asignación.</dd>
+              <dt>Ingresos de productor</dt>
+              <dd>ETH ganado por liquidaciones confirmadas.</dd>
+              <dt>Ingresos ya retirados</dt>
+              <dd>{eth(statement.data?.withdrawn_earnings_wei)}</dd>
+            </dl>
+            <Notice>
+              Sepolia ETH y Anvil ETH son activos de prueba sin valor monetario
+              real. El saldo de tu wallet no es tu depósito en el vault.
+            </Notice>
+            <p className="fine-print">
+              Las retiradas seguras pueden seguir disponibles aunque la
+              comunidad esté suspendida; el contrato decide si están permitidas.
+            </p>
+          </Card>
+        </details>
       </div>
     </Page>
   );

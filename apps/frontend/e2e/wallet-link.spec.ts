@@ -95,6 +95,12 @@ test("real API: ownership challenge, signature verification and pending membersh
       expect.objectContaining({ address: account.address, is_verified: true }),
     ]),
   );
+  if (
+    !(await page
+      .locator(".management-menu")
+      .evaluate((el) => el.hasAttribute("open")))
+  )
+    await page.locator(".management-menu > summary").click();
   await page.getByRole("link", { name: "Mi comunidad", exact: true }).click();
   await page
     .getByLabel("Identificador de comunidad", { exact: true })

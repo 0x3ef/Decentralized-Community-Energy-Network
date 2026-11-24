@@ -102,10 +102,9 @@ export function WalletPanel({ balances = false }: { balances?: boolean }) {
               hint="Fondos retirables no reservados"
             />
             <Metric
-              label="ETH reservado"
-              value={eth(native.data?.reserved_wei)}
-              hint="Comprometido con asignaciones"
-              tone="amber"
+              label="SUN en wallet"
+              value={native.data ? `${units(native.data.sun_units)} SUN` : "—"}
+              hint="Créditos disponibles en tu wallet"
             />
             <Metric
               label="Ingresos reclamables"
@@ -113,62 +112,71 @@ export function WalletPanel({ balances = false }: { balances?: boolean }) {
               hint="Compensación del productor"
             />
           </div>
-          <div className="metrics">
-            <Metric
-              label="SUN en wallet"
-              value={native.data ? `${units(native.data.sun_units)} SUN` : "—"}
-            />
-            <Metric
-              label="SUN disponibles en depósito"
-              value={
-                native.data ? `${units(native.data.escrow_sun_units)} SUN` : "—"
-              }
-            />
-            <Metric
-              label="SUN reservados"
-              value={
-                native.data
-                  ? `${units(native.data.reserved_sun_units)} SUN`
-                  : "—"
-              }
-            />
-            <Metric
-              label="Precio de comunidad"
-              value={
-                native.data ? `${eth(native.data.price_wei_per_kwh)}/kWh` : "—"
-              }
-            />
-          </div>
-          <Card title="Autorizaciones SUN confirmadas">
-            <dl className="detail-list">
-              <dt>ETH total en depósito</dt>
-              <dd>
-                {native.data
-                  ? eth(
-                      (
-                        BigInt(native.data.available_wei) +
-                        BigInt(native.data.reserved_wei)
-                      ).toString(),
-                    )
-                  : "—"}
-              </dd>
-              <dt>Vault · allowance SUN</dt>
-              <dd>
-                {allowance.data ? `${units(allowance.data.vault)} SUN` : "—"}
-              </dd>
-              <dt>Contrato de retiro</dt>
-              <dd>
-                {allowance.data
-                  ? `${units(allowance.data.retirement)} SUN`
-                  : "—"}
-              </dd>
-            </dl>
-            <p className="fine-print">
-              Balances del servidor para la wallet verificada:{" "}
-              <code>{native.data?.address ?? "No disponible"}</code>. Las
-              autorizaciones consultan la cuenta conectada en su red.
-            </p>
-          </Card>
+          <details className="disclosure">
+            <summary>SUN, reservas y autorizaciones</summary>
+            <div className="metrics">
+              <Metric
+                label="ETH reservado"
+                value={eth(native.data?.reserved_wei)}
+                hint="Comprometido con asignaciones"
+                tone="amber"
+              />
+              <Metric
+                label="SUN disponibles en depósito"
+                value={
+                  native.data
+                    ? `${units(native.data.escrow_sun_units)} SUN`
+                    : "—"
+                }
+              />
+              <Metric
+                label="SUN reservados"
+                value={
+                  native.data
+                    ? `${units(native.data.reserved_sun_units)} SUN`
+                    : "—"
+                }
+              />
+              <Metric
+                label="Precio de comunidad"
+                value={
+                  native.data
+                    ? `${eth(native.data.price_wei_per_kwh)}/kWh`
+                    : "—"
+                }
+              />
+            </div>
+            <Card title="Autorizaciones SUN confirmadas">
+              <dl className="detail-list">
+                <dt>ETH total en depósito</dt>
+                <dd>
+                  {native.data
+                    ? eth(
+                        (
+                          BigInt(native.data.available_wei) +
+                          BigInt(native.data.reserved_wei)
+                        ).toString(),
+                      )
+                    : "—"}
+                </dd>
+                <dt>Vault · allowance SUN</dt>
+                <dd>
+                  {allowance.data ? `${units(allowance.data.vault)} SUN` : "—"}
+                </dd>
+                <dt>Contrato de retiro</dt>
+                <dd>
+                  {allowance.data
+                    ? `${units(allowance.data.retirement)} SUN`
+                    : "—"}
+                </dd>
+              </dl>
+              <p className="fine-print">
+                Balances del servidor para la wallet verificada:{" "}
+                <code>{native.data?.address ?? "No disponible"}</code>. Las
+                autorizaciones consultan la cuenta conectada en su red.
+              </p>
+            </Card>
+          </details>
           {native.isError && (
             <Notice tone="warning">
               No se pudieron consultar los balances confirmados. Revisa tu
